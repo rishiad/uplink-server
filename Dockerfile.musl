@@ -1,0 +1,36 @@
+# Build static VSCode server with MUSL (works on any Linux)
+FROM alpine:3.19
+
+ARG TARGETARCH
+
+RUN apk add --no-cache \
+    git tar gzip gcc g++ make python3 curl ca-certificates \
+    nodejs npm \
+    libx11-dev libxkbfile-dev libsecret-dev krb5-dev
+
+WORKDIR /workspace
+
+# Copy custom sidecar
+COPY sidecar /workspace/vscode
+
+WORKDIR /workspace/vscode
+
+# Install dependencies and build
+RUN npm ci
+
+# Build server based on architecture
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        npm run gulp vscode-server-linux-arm64-lowmem; \
+    else \
+        npm run gulp vscode-server-linux-x64-lowmem; \
+    fi
+
+# Package the server
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        cd ../vscode-server-linux-arm64 && tar czf /server.tar.gz .; \
+    else \
+        cd ../vscode-server-linux-x64 && tar czf /server.tar.gz .; \
+    fi
+
+FROM scratch
+COPY --from=0 /server.tar.gz /
