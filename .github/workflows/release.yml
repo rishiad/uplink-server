@@ -1,0 +1,89 @@
+name: Release Server
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build ${{ matrix.variant }}
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      matrix:
+        include:
+          - variant: linux-x64-glibc
+            dockerfile: Dockerfile.glibc227
+            platform: linux/amd64
+          - variant: linux-arm64-glibc
+            dockerfile: Dockerfile.glibc227
+            platform: linux/arm64
+          - variant: linux-x64-musl
+            dockerfile: Dockerfile.musl
+            platform: linux/amd64
+          - variant: linux-arm64-musl
+            dockerfile: Dockerfile.musl
+            platform: linux/arm64
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      
+      - name: Build server
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platform }}
+          outputs: type=local,dest=./output
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Extract and package
+        run: |
+          mkdir -p dist
+          tar -xzf output/server.tar.gz -C dist
+          cd dist
+          tar -czf ../server-${{ matrix.variant }}-${{ steps.version.outputs.VERSION }}.tar.gz .
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ matrix.variant }}
+          path: server-${{ matrix.variant }}-${{ steps.version.outputs.VERSION }}.tar.gz
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/*/server-*.tar.gz
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
+          generate_release_notes: true
