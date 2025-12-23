@@ -5,8 +5,17 @@ ARG TARGETARCH
 
 RUN apk add --no-cache \
     git tar gzip gcc g++ make python3 curl ca-certificates \
-    nodejs npm \
     libx11-dev libxkbfile-dev libsecret-dev krb5-dev
+
+# Install Node.js 22 from official binaries
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        NODE_ARCH="arm64"; \
+    else \
+        NODE_ARCH="x64"; \
+    fi && \
+    curl -fsSL "https://nodejs.org/dist/v22.21.0/node-v22.21.0-linux-${NODE_ARCH}.tar.xz" -o node.tar.xz && \
+    tar -xJf node.tar.xz -C /usr/local --strip-components=1 && \
+    rm node.tar.xz
 
 WORKDIR /workspace
 
