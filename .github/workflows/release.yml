@@ -16,16 +16,10 @@ jobs:
       matrix:
         include:
           - variant: linux-x64-glibc
-            dockerfile: Dockerfile.glibc227
+            dockerfile: Dockerfile
             platform: linux/amd64
           - variant: linux-arm64-glibc
-            dockerfile: Dockerfile.glibc227
-            platform: linux/arm64
-          - variant: linux-x64-musl
-            dockerfile: Dockerfile.musl
-            platform: linux/amd64
-          - variant: linux-arm64-musl
-            dockerfile: Dockerfile.musl
+            dockerfile: Dockerfile
             platform: linux/arm64
     
     steps:

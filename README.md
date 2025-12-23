@@ -16,24 +16,7 @@ The server consists of:
   - Builds both Node.js sidecar and Rust launcher
   - Packages complete server distributions
 
-## Build Variants
-
-### GLIBC 2.35
-- **Base**: Ubuntu 22.04
-- **Architectures**: x64, arm64
-
-### MUSL Static
-- **Base**: Alpine Linux
-- **Architectures**: x64, arm64
-
 ## Building
-
-### Prerequisites
-- Docker with buildx support
-- Multi-platform build capability
-
-### Build 
-
 ```bash
 ./build-servers.sh
 ```
@@ -44,10 +27,8 @@ Builds are created in `./dist/` directory:
 
 ```
 dist/
-├── server-linux-x64-glibc227-<version>.tar.gz
-├── server-linux-arm64-glibc227-<version>.tar.gz
-├── server-linux-x64-musl-<version>.tar.gz
-└── server-linux-arm64-musl-<version>.tar.gz
+├── server-linux-x64-glibc-<version>.tar.gz
+└── server-linux-arm64-glibc-<version>.tar.gz
 ```
 
 ## Development
