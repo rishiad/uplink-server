@@ -119,13 +119,13 @@ impl Args {
             manifest_dir
                 .join("target")
                 .join("release")
-                .join("openvscode-server")
+                .join("uplink-server")
         });
 
         let server_app_name = match server_app_name {
             Some(name) => name,
             None => load_server_app_name(&build_dir, manifest_dir)
-                .unwrap_or_else(|| "openvscode-server".to_string()),
+                .unwrap_or_else(|| "uplink-server".to_string()),
         };
 
         Ok(Self {
@@ -191,6 +191,6 @@ fn print_usage() {
         Defaults:\n\
           --build-dir    server/vscode-server-linux-arm64\n\
           --out          extention/resources/sidecar/sidecar.tar.gz\n\
-          --launcher-bin server/target/release/openvscode-server\n"
+          --launcher-bin server/target/release/uplink-server\n"
     );
 }
