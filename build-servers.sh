@@ -1,6 +1,16 @@
 #!/bin/bash
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Read version from VERSION file
+if [[ -f "${SCRIPT_DIR}/VERSION" ]]; then
+  SERVER_VERSION="$(cat "${SCRIPT_DIR}/VERSION" | tr -d '\n')"
+else
+  echo "Error: VERSION file not found"
+  exit 1
+fi
+
 # Default values
 VSCODE_VERSION="${VSCODE_VERSION:-1.103.2}"
 OUTPUT_DIR="${OUTPUT_DIR:-./dist}"
@@ -13,7 +23,11 @@ while [[ $# -gt 0 ]]; do
       ARCH="$2"
       shift 2
       ;;
-    --version)
+    --server-version)
+      echo "Note: Server version is read from VERSION file"
+      shift 2
+      ;;
+    --vscode-version)
       VSCODE_VERSION="$2"
       shift 2
       ;;
@@ -26,14 +40,15 @@ while [[ $# -gt 0 ]]; do
       echo ""
       echo "Options:"
       echo "  --arch <x64|arm64>        Build specific architecture (default: all)"
-      echo "  --version <version>       VSCode version (default: 1.103.2)"
+      echo "  --server-version <ver>    (ignored - reads from VERSION file)"
+      echo "  --vscode-version <ver>    VSCode version to build from (default: 1.103.2)"
       echo "  --output <dir>            Output directory (default: ./dist)"
       echo "  --help, -h                Show this help message"
       echo ""
       echo "Examples:"
       echo "  $0                        # Build all architectures"
       echo "  $0 --arch arm64           # Build only arm64"
-      echo "  $0 --arch x64             # Build only x64"
+      echo "  $0 --server-version 0.2.0 # Build with specific server version"
       exit 0
       ;;
     *)
@@ -50,28 +65,26 @@ if [[ -n "$ARCH" && "$ARCH" != "x64" && "$ARCH" != "arm64" ]]; then
   exit 1
 fi
 
-echo "Building VSCode servers for version ${VSCODE_VERSION}"
+echo "Building uplink-server v${SERVER_VERSION} (based on VSCode ${VSCODE_VERSION})"
 mkdir -p "${OUTPUT_DIR}"
 
-# Function to build a specific variant
-build_variant() {
-  local variant=$1
-  local arch=$2
-  local platform=$3
-  local dockerfile=$4
+# Function to build for a specific architecture
+build_arch() {
+  local arch=$1
+  local platform=$2
   
-  echo "Building ${variant} ${arch}..."
+  echo "Building ${arch}..."
   docker buildx build \
     --platform "${platform}" \
     --build-arg VSCODE_VERSION="${VSCODE_VERSION}" \
-    -f "${dockerfile}" \
-    -t "uplink-server:${variant}-${arch}" \
-    --output "type=local,dest=${OUTPUT_DIR}/tmp-${variant}-${arch}" \
+    -f "Dockerfile" \
+    -t "uplink-server:${arch}" \
+    --output "type=local,dest=${OUTPUT_DIR}/tmp-${arch}" \
     .
   
-  mv "${OUTPUT_DIR}/tmp-${variant}-${arch}/server.tar.gz" \
-     "${OUTPUT_DIR}/server-linux-${arch}-${variant}-${VSCODE_VERSION}.tar.gz"
-  rm -rf "${OUTPUT_DIR}/tmp-${variant}-${arch}"
+  mv "${OUTPUT_DIR}/tmp-${arch}/server.tar.gz" \
+     "${OUTPUT_DIR}/uplink-server-${arch}-${SERVER_VERSION}.tar.gz"
+  rm -rf "${OUTPUT_DIR}/tmp-${arch}"
 }
 
 # Determine what to build
@@ -85,13 +98,12 @@ should_build() {
   return 0
 }
 
-# Build requested variants (glibc only)
 if should_build "x64"; then
-  build_variant "glibc" "x64" "linux/amd64" "Dockerfile"
+  build_arch "x64" "linux/amd64"
 fi
 
 if should_build "arm64"; then
-  build_variant "glibc" "arm64" "linux/arm64" "Dockerfile"
+  build_arch "arm64" "linux/arm64"
 fi
 
 echo "Build complete! Artifacts in ${OUTPUT_DIR}:"

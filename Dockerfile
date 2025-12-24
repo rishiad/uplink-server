@@ -3,6 +3,7 @@
 FROM ubuntu:22.04
 
 ARG TARGETARCH
+ARG VSCODE_VERSION=1.107.0
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -14,6 +15,21 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
+
+# Download official VSCode to extract vsda module (pinned version for reproducibility)
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        curl -L "https://update.code.visualstudio.com/${VSCODE_VERSION}/linux-arm64/stable" -o /tmp/vscode.tar.gz; \
+    else \
+        curl -L "https://update.code.visualstudio.com/${VSCODE_VERSION}/linux-x64/stable" -o /tmp/vscode.tar.gz; \
+    fi && \
+    mkdir -p /tmp/vscode && \
+    tar -xzf /tmp/vscode.tar.gz -C /tmp/vscode --strip-components=1 && \
+    mkdir -p /vsda && \
+    if [ ! -d "/tmp/vscode/resources/app/node_modules/vsda" ]; then \
+        echo "Error: vsda module not found in VSCode ${VSCODE_VERSION}" && exit 1; \
+    fi && \
+    cp -r /tmp/vscode/resources/app/node_modules/vsda /vsda/ && \
+    rm -rf /tmp/vscode /tmp/vscode.tar.gz
 
 # Copy custom sidecar
 COPY sidecar /workspace/vscode
@@ -28,6 +44,15 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
         npm run gulp vscode-server-linux-arm64-lowmem; \
     else \
         npm run gulp vscode-server-linux-x64-lowmem; \
+    fi
+
+# Copy vsda module into the built server
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        mkdir -p ../vscode-server-linux-arm64/node_modules && \
+        cp -r /vsda/vsda ../vscode-server-linux-arm64/node_modules/; \
+    else \
+        mkdir -p ../vscode-server-linux-x64/node_modules && \
+        cp -r /vsda/vsda ../vscode-server-linux-x64/node_modules/; \
     fi
 
 # Package the server
