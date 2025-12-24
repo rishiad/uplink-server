@@ -1,5 +1,11 @@
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.dependencies]
+
 [package]
-name = "remotedev-server"
+name = "uplink-server"
 version = "0.1.0"
 edition = "2024"
 
