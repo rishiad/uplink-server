@@ -31,8 +31,8 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
     cp -r /tmp/vscode/resources/app/node_modules/vsda /vsda/ && \
     rm -rf /tmp/vscode /tmp/vscode.tar.gz
 
-# Copy custom sidecar
-COPY sidecar /workspace/vscode
+# Copy VSCode server source
+COPY vscode-server /workspace/vscode
 
 WORKDIR /workspace/vscode
 

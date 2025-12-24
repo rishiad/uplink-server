@@ -2,7 +2,7 @@
 
 Complete registry of all IPC channels in the VSCode Remote protocol.
 
-**Registration Location**: `uplink-server/sidecar/src/vs/server/node/serverServices.ts:setupServerServices()`
+**Registration Location**: `uplink-server/vscode-server/src/vs/server/node/serverServices.ts:setupServerServices()`
 
 ## Channel Registry
 
@@ -10,7 +10,7 @@ Complete registry of all IPC channels in the VSCode Remote protocol.
 
 **Purpose**: Remote logging service  
 **Server**: `LoggerChannel`  
-**Location**: `sidecar/src/vs/platform/log/common/logIpc.ts`
+**Location**: `vscode-server/src/vs/platform/log/common/logIpc.ts`
 
 **Operations**:
 - `createLogger(resource, options)` - Create logger instance
@@ -27,7 +27,7 @@ Complete registry of all IPC channels in the VSCode Remote protocol.
 
 **Purpose**: Telemetry data collection  
 **Server**: `ServerTelemetryChannel`  
-**Location**: `sidecar/src/vs/platform/telemetry/common/remoteTelemetryChannel.ts`
+**Location**: `vscode-server/src/vs/platform/telemetry/common/remoteTelemetryChannel.ts`
 
 **Operations**:
 - `publicLog(eventName, data)` - Send telemetry event
@@ -44,7 +44,7 @@ Complete registry of all IPC channels in the VSCode Remote protocol.
 
 **Purpose**: HTTP request service  
 **Server**: `RequestChannel`  
-**Location**: `sidecar/src/vs/platform/request/common/requestIpc.ts`
+**Location**: `vscode-server/src/vs/platform/request/common/requestIpc.ts`
 
 **Operations**:
 - `request(options, token)` - Make HTTP request
@@ -56,7 +56,7 @@ Complete registry of all IPC channels in the VSCode Remote protocol.
 
 **Purpose**: Remote environment information  
 **Server**: `RemoteAgentEnvironmentChannel`  
-**Location**: `sidecar/src/vs/server/node/remoteAgentEnvironmentImpl.ts`
+**Location**: `vscode-server/src/vs/server/node/remoteAgentEnvironmentImpl.ts`
 
 **Operations**:
 - `getEnvironmentData()` - Get environment info (paths, OS, arch)
@@ -92,7 +92,7 @@ Complete registry of all IPC channels in the VSCode Remote protocol.
 
 **Purpose**: Filesystem operations  
 **Server**: `RemoteAgentFileSystemProviderChannel`  
-**Location**: `sidecar/src/vs/server/node/remoteFileSystemProviderServer.ts`
+**Location**: `vscode-server/src/vs/server/node/remoteFileSystemProviderServer.ts`
 
 **See**: [Filesystem Protocol](03-filesystem.md)
 
@@ -117,7 +117,7 @@ Complete registry of all IPC channels in the VSCode Remote protocol.
 
 **Purpose**: Terminal/PTY management  
 **Server**: `RemoteTerminalChannel`  
-**Location**: `sidecar/src/vs/server/node/remoteTerminalChannel.ts`
+**Location**: `vscode-server/src/vs/server/node/remoteTerminalChannel.ts`
 
 **Operations**:
 - `createTerminal(options)` - Create terminal instance
@@ -137,7 +137,7 @@ Complete registry of all IPC channels in the VSCode Remote protocol.
 
 **Purpose**: Extension management  
 **Server**: `ExtensionManagementChannel`  
-**Location**: `sidecar/src/vs/platform/extensionManagement/common/extensionManagementIpc.ts`
+**Location**: `vscode-server/src/vs/platform/extensionManagement/common/extensionManagementIpc.ts`
 
 **Operations**:
 - `install(vsix)` - Install extension from VSIX
@@ -159,7 +159,7 @@ Complete registry of all IPC channels in the VSCode Remote protocol.
 
 **Purpose**: Extension scanning  
 **Server**: `RemoteExtensionsScannerChannel`  
-**Location**: `sidecar/src/vs/server/node/remoteExtensionsScanner.ts`
+**Location**: `vscode-server/src/vs/server/node/remoteExtensionsScanner.ts`
 
 **Operations**:
 - `scanExtensions(type, profileLocation)` - Scan extensions
@@ -177,7 +177,7 @@ Complete registry of all IPC channels in the VSCode Remote protocol.
 
 **Purpose**: User data profile management  
 **Server**: `RemoteUserDataProfilesServiceChannel`  
-**Location**: `sidecar/src/vs/platform/userDataProfile/common/userDataProfileIpc.ts`
+**Location**: `vscode-server/src/vs/platform/userDataProfile/common/userDataProfileIpc.ts`
 
 **Operations**:
 - `createProfile(name, options)` - Create profile
@@ -195,7 +195,7 @@ Complete registry of all IPC channels in the VSCode Remote protocol.
 
 **Purpose**: File download service  
 **Server**: `DownloadChannel` (from client)  
-**Location**: `sidecar/src/vs/platform/download/common/downloadIpc.ts`
+**Location**: `vscode-server/src/vs/platform/download/common/downloadIpc.ts`
 
 **Operations**:
 - `download(uri, target, options)` - Download file
@@ -209,7 +209,7 @@ Complete registry of all IPC channels in the VSCode Remote protocol.
 
 **Purpose**: Extension host debugging  
 **Server**: `ExtensionHostDebugBroadcastChannel`  
-**Location**: `sidecar/src/vs/platform/debug/common/extensionHostDebugIpc.ts`
+**Location**: `vscode-server/src/vs/platform/debug/common/extensionHostDebugIpc.ts`
 
 **Operations**:
 - `reload(sessionId)` - Reload debug session
@@ -227,7 +227,7 @@ Complete registry of all IPC channels in the VSCode Remote protocol.
 
 **Purpose**: MCP (Model Context Protocol) server management  
 **Server**: `McpManagementChannel`  
-**Location**: `sidecar/src/vs/platform/mcp/common/mcpManagementIpc.ts`
+**Location**: `vscode-server/src/vs/platform/mcp/common/mcpManagementIpc.ts`
 
 **Operations**:
 - `install(vsix)` - Install MCP server
@@ -244,7 +244,7 @@ Complete registry of all IPC channels in the VSCode Remote protocol.
 
 **Purpose**: MCP server discovery  
 **Server**: `NativeMcpDiscoveryHelperChannel`  
-**Location**: `sidecar/src/vs/platform/mcp/node/nativeMcpDiscoveryHelperChannel.ts`
+**Location**: `vscode-server/src/vs/platform/mcp/node/nativeMcpDiscoveryHelperChannel.ts`
 
 **Operations**:
 - Discovery and enumeration of MCP servers
@@ -407,6 +407,6 @@ Each channel call involves:
 
 ## Code References
 
-- `sidecar/src/vs/server/node/serverServices.ts` - Channel registration
-- `sidecar/src/vs/base/parts/ipc/common/ipc.ts` - IPC infrastructure
+- `vscode-server/src/vs/server/node/serverServices.ts` - Channel registration
+- `vscode-server/src/vs/base/parts/ipc/common/ipc.ts` - IPC infrastructure
 - Individual channel implementations in respective service directories

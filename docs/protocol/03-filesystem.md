@@ -4,7 +4,7 @@ Remote filesystem operations over IPC.
 
 **Channel Name**: `vscode.remoteFileSystemProvider`
 
-**Location**: `uplink-server/sidecar/src/vs/server/node/remoteFileSystemProviderServer.ts`
+**Location**: `uplink-server/vscode-server/src/vs/server/node/remoteFileSystemProviderServer.ts`
 
 ## Architecture
 
@@ -54,7 +54,7 @@ interface FileSystemProvider {
 }
 ```
 
-**Interface Location**: `sidecar/src/vs/platform/files/common/files.ts`
+**Interface Location**: `vscode-server/src/vs/platform/files/common/files.ts`
 
 ## Data Types
 
@@ -145,7 +145,7 @@ const clientUri = transformer.transformOutgoing(serverUri);
 vscode-remote://ssh-remote+hostname/home/user/file.txt
 ```
 
-**Transformer Location**: `sidecar/src/vs/base/common/uriTransformer.ts`
+**Transformer Location**: `vscode-server/src/vs/base/common/uriTransformer.ts`
 
 ## Operations
 
@@ -480,10 +480,10 @@ throw error;
 ## Code References
 
 ### Server
-- `sidecar/src/vs/server/node/remoteFileSystemProviderServer.ts` - Main channel
-- `sidecar/src/vs/platform/files/node/diskFileSystemProvider.ts` - Disk implementation
-- `sidecar/src/vs/platform/files/node/diskFileSystemProviderServer.ts` - Base channel
-- `sidecar/src/vs/platform/files/common/watcher.ts` - File watching
+- `vscode-server/src/vs/server/node/remoteFileSystemProviderServer.ts` - Main channel
+- `vscode-server/src/vs/platform/files/node/diskFileSystemProvider.ts` - Disk implementation
+- `vscode-server/src/vs/platform/files/node/diskFileSystemProviderServer.ts` - Base channel
+- `vscode-server/src/vs/platform/files/common/watcher.ts` - File watching
 
 ### Client (Built-in VSCode)
 - File service registration
@@ -491,6 +491,6 @@ throw error;
 - Explorer UI integration
 
 ### Common
-- `sidecar/src/vs/platform/files/common/files.ts` - Interfaces
-- `sidecar/src/vs/base/common/uri.ts` - URI handling
-- `sidecar/src/vs/base/common/uriTransformer.ts` - URI transformation
+- `vscode-server/src/vs/platform/files/common/files.ts` - Interfaces
+- `vscode-server/src/vs/base/common/uri.ts` - URI handling
+- `vscode-server/src/vs/base/common/uriTransformer.ts` - URI transformation

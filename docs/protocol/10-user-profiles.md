@@ -5,7 +5,7 @@ Isolated user environments for settings, extensions, and state.
 ## IPC Channel: `userDataProfiles`
 
 **Server**: `RemoteUserDataProfilesServiceChannel`  
-**Location**: `sidecar/src/vs/platform/userDataProfile/common/userDataProfileIpc.ts`
+**Location**: `vscode-server/src/vs/platform/userDataProfile/common/userDataProfileIpc.ts`
 
 ## Profile Structure
 

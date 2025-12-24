@@ -6,7 +6,7 @@ Reverse channel where server requests downloads from client.
 
 **Direction**: Server → Client (reverse of normal)  
 **Client**: `DownloadServiceChannelClient`  
-**Location**: `sidecar/src/vs/platform/download/common/downloadIpc.ts`
+**Location**: `vscode-server/src/vs/platform/download/common/downloadIpc.ts`
 
 ## Architecture
 

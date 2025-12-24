@@ -31,7 +31,7 @@ Channel-based RPC system built on top of PersistentProtocol.
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Location**: `uplink-server/sidecar/src/vs/base/parts/ipc/common/ipc.ts`
+**Location**: `uplink-server/vscode-server/src/vs/base/parts/ipc/common/ipc.ts`
 
 ## Request/Response Protocol
 
@@ -379,14 +379,14 @@ await Promise.all([p1, p2, p3]);
 ## Code References
 
 ### Core IPC
-- `sidecar/src/vs/base/parts/ipc/common/ipc.ts` - Main IPC implementation
-- `sidecar/src/vs/base/parts/ipc/common/ipc.net.ts` - Protocol layer
+- `vscode-server/src/vs/base/parts/ipc/common/ipc.ts` - Main IPC implementation
+- `vscode-server/src/vs/base/parts/ipc/common/ipc.net.ts` - Protocol layer
 
 ### Server Setup
-- `sidecar/src/vs/server/node/serverServices.ts:setupServerServices()` - Channel registration
-- `sidecar/src/vs/server/node/serverServices.ts:SocketServer` - Multi-client server
+- `vscode-server/src/vs/server/node/serverServices.ts:setupServerServices()` - Channel registration
+- `vscode-server/src/vs/server/node/serverServices.ts:SocketServer` - Multi-client server
 
 ### Usage Examples
-- `sidecar/src/vs/server/node/remoteFileSystemProviderServer.ts` - Filesystem channel
-- `sidecar/src/vs/server/node/remoteTerminalChannel.ts` - Terminal channel
-- `sidecar/src/vs/server/node/remoteAgentEnvironmentImpl.ts` - Environment channel
+- `vscode-server/src/vs/server/node/remoteFileSystemProviderServer.ts` - Filesystem channel
+- `vscode-server/src/vs/server/node/remoteTerminalChannel.ts` - Terminal channel
+- `vscode-server/src/vs/server/node/remoteAgentEnvironmentImpl.ts` - Environment channel

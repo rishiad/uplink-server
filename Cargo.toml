@@ -14,5 +14,5 @@ name = "uplink-server"
 path = "src/main.rs"
 
 [[bin]]
-name = "sidecar-packager"
-path = "src/bin/sidecar_packager.rs"
+name = "vscode-server-packager"
+path = "src/bin/vscode_server_packager.rs"

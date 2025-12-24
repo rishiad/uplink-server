@@ -20,7 +20,7 @@ Network
 
 ## PersistentProtocol
 
-**Location**: `uplink-server/sidecar/src/vs/base/parts/ipc/common/ipc.net.ts`
+**Location**: `uplink-server/vscode-server/src/vs/base/parts/ipc/common/ipc.net.ts`
 
 ### Message Format
 
@@ -91,7 +91,7 @@ enum ProtocolConstants {
 
 ## WebSocket Layer
 
-**Location**: `uplink-server/sidecar/src/vs/base/parts/ipc/node/ipc.net.ts`
+**Location**: `uplink-server/vscode-server/src/vs/base/parts/ipc/node/ipc.net.ts`
 
 ### Upgrade Process
 
@@ -159,7 +159,7 @@ pub fn ssh_forward_port(
 
 ## Connection Handshake
 
-**Location**: `uplink-server/sidecar/src/vs/server/node/remoteExtensionHostAgentServer.ts`
+**Location**: `uplink-server/vscode-server/src/vs/server/node/remoteExtensionHostAgentServer.ts`
 
 ### Handshake Sequence
 
@@ -242,7 +242,7 @@ enum ConnectionType {
 - `native/src/lib.rs:ssh_forward_port()` - Rust SSH implementation
 
 ### Server
-- `sidecar/src/vs/base/parts/ipc/common/ipc.net.ts` - PersistentProtocol
-- `sidecar/src/vs/base/parts/ipc/node/ipc.net.ts` - WebSocket handling
-- `sidecar/src/vs/server/node/remoteExtensionHostAgentServer.ts` - Handshake
-- `sidecar/src/server-main.ts` - HTTP server setup
+- `vscode-server/src/vs/base/parts/ipc/common/ipc.net.ts` - PersistentProtocol
+- `vscode-server/src/vs/base/parts/ipc/node/ipc.net.ts` - WebSocket handling
+- `vscode-server/src/vs/server/node/remoteExtensionHostAgentServer.ts` - Handshake
+- `vscode-server/src/server-main.ts` - HTTP server setup
