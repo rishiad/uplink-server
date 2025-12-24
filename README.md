@@ -1,5 +1,5 @@
 # Uplink Server
-Custom VSCode server implementation for Uplink remote development extension built from the source tree of [openvscode-server](https://github.com/gitpod-io/openvscode-server). 
+Custom VSCode server implementation for Uplink remote development extension built from the source tree of [openvscode-server](https://github.com/gitpod-io/openvscode-server). The protcol docs outlining the communication between uplink server, uplink extention and vscode client are under `docs/protocol` 
 
 ## Architecture
 The server consists of:
