@@ -5,7 +5,7 @@ Debugging extensions running in the remote extension host.
 ## IPC Channel: `ExtensionHostDebugBroadcast`
 
 **Server**: `ExtensionHostDebugBroadcastChannel`  
-**Location**: `sidecar/src/vs/platform/debug/common/extensionHostDebugIpc.ts`
+**Location**: `vscode-server/src/vs/platform/debug/common/extensionHostDebugIpc.ts`
 
 ## Architecture
 

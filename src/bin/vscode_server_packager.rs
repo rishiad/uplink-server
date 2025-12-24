@@ -26,7 +26,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     if !args.build_dir.is_dir() {
         return Err(format!(
-            "sidecar build directory not found at {}",
+            "vscode-server build directory not found at {}",
             args.build_dir.display()
         )
         .into());
@@ -41,7 +41,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let bin_dir = args.build_dir.join("bin");
     if !bin_dir.is_dir() {
-        return Err(format!("sidecar bin directory missing at {}", bin_dir.display()).into());
+        return Err(format!("vscode-server bin directory missing at {}", bin_dir.display()).into());
     }
 
     let server_bin_path = bin_dir.join(&args.server_app_name);
@@ -53,7 +53,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     write_tar_gz(&args.build_dir, &args.out_path)?;
-    println!("Wrote sidecar archive to {}", args.out_path.display());
+    println!("Wrote vscode-server archive to {}", args.out_path.display());
 
     Ok(())
 }
@@ -113,7 +113,7 @@ impl Args {
             manifest_dir
                 .parent()
                 .unwrap_or(manifest_dir)
-                .join("extention/resources/sidecar/sidecar.tar.gz")
+                .join("extention/resources/vscode-server/vscode-server.tar.gz")
         });
         let launcher_bin = launcher_bin.unwrap_or_else(|| {
             manifest_dir
@@ -146,7 +146,7 @@ fn next_value(
 }
 
 fn load_server_app_name(build_dir: &Path, manifest_dir: &Path) -> Option<String> {
-    let candidates = [build_dir.join("product.json"), manifest_dir.join("sidecar/product.json")];
+    let candidates = [build_dir.join("product.json"), manifest_dir.join("vscode-server/product.json")];
     for candidate in candidates {
         if let Ok(contents) = fs::read_to_string(candidate) {
             if let Ok(product) = serde_json::from_str::<ProductJson>(&contents) {
@@ -172,7 +172,7 @@ fn set_executable(path: &Path, source: &Path) -> Result<(), Box<dyn std::error::
 fn write_tar_gz(build_dir: &Path, out_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let top_level = build_dir
         .file_name()
-        .ok_or("failed to determine sidecar folder name")?;
+        .ok_or("failed to determine vscode-server folder name")?;
 
     let file = fs::File::create(out_path)?;
     let enc = GzEncoder::new(file, Compression::default());
@@ -186,11 +186,11 @@ fn write_tar_gz(build_dir: &Path, out_path: &Path) -> Result<(), Box<dyn std::er
 
 fn print_usage() {
     println!(
-        "Usage: sidecar-packager [--build-dir PATH] [--out PATH] [--launcher-bin PATH] [--server-app-name NAME]\n\
+        "Usage: vscode-server-packager [--build-dir PATH] [--out PATH] [--launcher-bin PATH] [--server-app-name NAME]\n\
         \n\
         Defaults:\n\
           --build-dir    server/vscode-server-linux-arm64\n\
-          --out          extention/resources/sidecar/sidecar.tar.gz\n\
+          --out          extention/resources/vscode-server/vscode-server.tar.gz\n\
           --launcher-bin server/target/release/uplink-server\n"
     );
 }
