@@ -22,10 +22,75 @@ import { PtyService } from './ptyService.js';
 import { isUtilityProcess } from '../../../base/parts/sandbox/node/electronTypes.js';
 import { timeout } from '../../../base/common/async.js';
 import { DisposableStore } from '../../../base/common/lifecycle.js';
+import { ChildProcess, spawn } from 'child_process';
+import * as path from 'path';
+import * as fs from 'fs';
+import { fileURLToPath } from 'url';
 
+console.log('[ptyHostMain] Starting...');
 startPtyHost();
 
+let uplinkPtyProcess: ChildProcess | null = null;
+
+/** Start the uplink-pty Rust service */
+async function startUplinkPty(logService: { info: (msg: string) => void; error: (msg: string, err?: any) => void }): Promise<void> {
+	// Find uplink-pty binary relative to server root
+	// ESM doesn't have __dirname, so we derive it from import.meta.url
+	const currentFile = fileURLToPath(import.meta.url);
+	const currentDir = path.dirname(currentFile);
+	// From out/vs/platform/terminal/node/ -> server root
+	const serverRoot = path.resolve(currentDir, '../../../../..');
+	const uplinkPtyPath = path.join(serverRoot, 'bin', 'uplink-pty');
+
+	console.log(`[uplink-pty] currentFile: ${currentFile}`);
+	console.log(`[uplink-pty] serverRoot: ${serverRoot}`);
+	console.log(`[uplink-pty] Looking for binary at: ${uplinkPtyPath}`);
+	console.log(`[uplink-pty] Binary exists: ${fs.existsSync(uplinkPtyPath)}`);
+
+	if (!fs.existsSync(uplinkPtyPath)) {
+		throw new Error(`uplink-pty binary not found at ${uplinkPtyPath}`);
+	}
+
+	return new Promise((resolve, reject) => {
+		uplinkPtyProcess = spawn(uplinkPtyPath, [], {
+			stdio: ['ignore', 'pipe', 'pipe'],
+			detached: false
+		});
+
+		uplinkPtyProcess.on('error', (err) => {
+			reject(new Error(`Failed to start uplink-pty: ${err.message}`));
+		});
+
+		uplinkPtyProcess.on('exit', (code) => {
+			logService.error(`uplink-pty exited with code ${code}`);
+		});
+
+		// Wait for "listening" message or timeout
+		let started = false;
+		uplinkPtyProcess.stdout?.on('data', (data: Buffer) => {
+			const msg = data.toString();
+			logService.info(`[uplink-pty] ${msg.trim()}`);
+			if (!started && msg.includes('listening')) {
+				started = true;
+				resolve();
+			}
+		});
+
+		uplinkPtyProcess.stderr?.on('data', (data: Buffer) => {
+			logService.error(`[uplink-pty] ${data.toString().trim()}`);
+		});
+
+		// Timeout after 5 seconds
+		setTimeout(() => {
+			if (!started) {
+				reject(new Error('uplink-pty failed to start within 5 seconds'));
+			}
+		}, 5000);
+	});
+}
+
 async function startPtyHost() {
+	console.log('[ptyHostMain] startPtyHost called');
 	// Parse environment variables
 	const startupDelay = parseInt(process.env.VSCODE_STARTUP_DELAY ?? '0');
 	const simulatedLatency = parseInt(process.env.VSCODE_LATENCY ?? '0');
@@ -75,12 +140,23 @@ async function startPtyHost() {
 
 	const disposables = new DisposableStore();
 
+	// Start uplink-pty Rust service
+	console.log('[ptyHostMain] About to start uplink-pty');
+	try {
+		await startUplinkPty(logService);
+		console.log('[ptyHostMain] uplink-pty started successfully');
+	} catch (err) {
+		console.error('[ptyHostMain] Failed to start uplink-pty:', err);
+		logService.error('Failed to start uplink-pty:', err);
+		process.exit(1);
+	}
+
 	// Heartbeat responsiveness tracking
 	const heartbeatService = new HeartbeatService();
 	server.registerChannel(TerminalIpcChannels.Heartbeat, ProxyChannel.fromService(heartbeatService, disposables));
 
 	// Init pty service
-	const ptyService = new PtyService(logService, productService, reconnectConstants, simulatedLatency);
+	const ptyService = new PtyService(logService, reconnectConstants, simulatedLatency);
 	const ptyServiceChannel = ProxyChannel.fromService(ptyService, disposables);
 	server.registerChannel(TerminalIpcChannels.PtyHost, ptyServiceChannel);
 
@@ -92,6 +168,9 @@ async function startPtyHost() {
 	// Clean up
 	process.once('exit', () => {
 		logService.trace('Pty host exiting');
+		if (uplinkPtyProcess) {
+			uplinkPtyProcess.kill();
+		}
 		logService.dispose();
 		heartbeatService.dispose();
 		ptyService.dispose();

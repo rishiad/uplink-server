@@ -12,26 +12,37 @@ import { URI } from '../../../base/common/uri.js';
 import { getSystemShell } from '../../../base/node/shell.js';
 import { ILogService, LogLevel } from '../../log/common/log.js';
 import { RequestStore } from '../common/requestStore.js';
-import { IProcessDataEvent, IProcessReadyEvent, IPtyService, IRawTerminalInstanceLayoutInfo, IReconnectConstants, IShellLaunchConfig, ITerminalInstanceLayoutInfoById, ITerminalLaunchError, ITerminalsLayoutInfo, ITerminalTabLayoutInfoById, TerminalIcon, IProcessProperty, TitleEventSource, ProcessPropertyType, IProcessPropertyMap, IFixedTerminalDimensions, IPersistentTerminalProcessLaunchConfig, ICrossVersionSerializedTerminalState, ISerializedTerminalState, ITerminalProcessOptions, IPtyHostLatencyMeasurement, type IPtyServiceContribution, PosixShellType, ITerminalLaunchResult } from '../common/terminal.js';
+import { IProcessDataEvent, IProcessReadyEvent, IPtyService, IRawTerminalInstanceLayoutInfo, IReconnectConstants, IShellLaunchConfig, ITerminalInstanceLayoutInfoById, ITerminalLaunchError, ITerminalsLayoutInfo, ITerminalTabLayoutInfoById, TerminalIcon, IProcessProperty, TitleEventSource, ProcessPropertyType, IProcessPropertyMap, IFixedTerminalDimensions, IPersistentTerminalProcessLaunchConfig, ICrossVersionSerializedTerminalState, ISerializedTerminalState, ITerminalProcessOptions, IPtyHostLatencyMeasurement, type IPtyServiceContribution, PosixShellType, ITerminalLaunchResult, ITerminalChildProcess, TerminalShellType, IProcessReadyWindowsPty } from '../common/terminal.js';
 import { TerminalDataBufferer } from '../common/terminalDataBuffering.js';
 import { escapeNonWindowsPath } from '../common/terminalEnvironment.js';
 import type { ISerializeOptions, SerializeAddon as XtermSerializeAddon } from '@xterm/addon-serialize';
 import type { Unicode11Addon as XtermUnicode11Addon } from '@xterm/addon-unicode11';
 import { IGetTerminalLayoutInfoArgs, IProcessDetails, ISetTerminalLayoutInfoArgs, ITerminalTabLayoutInfoDto } from '../common/terminalProcess.js';
 import { getWindowsBuildNumber } from './terminalEnvironment.js';
-import { TerminalProcess } from './terminalProcess.js';
 import { localize } from '../../../nls.js';
+
+/**
+ * Extended terminal process interface with additional properties needed by PersistentTerminalProcess
+ */
+interface IExtendedTerminalProcess extends ITerminalChildProcess {
+	readonly shellLaunchConfig: IShellLaunchConfig;
+	readonly currentTitle: string;
+	readonly shellType: TerminalShellType | undefined;
+	readonly hasChildProcesses: boolean;
+	getWindowsPty(): IProcessReadyWindowsPty | undefined;
+	clearUnacknowledgedChars(): void;
+}
 import { ignoreProcessNames } from './childProcessMonitor.js';
 import { ErrorNoTelemetry } from '../../../base/common/errors.js';
 import { ShellIntegrationAddon } from '../common/xterm/shellIntegrationAddon.js';
 import { formatMessageForTerminal } from '../common/terminalStrings.js';
 import { IPtyHostProcessReplayEvent } from '../common/capabilities/capabilities.js';
-import { IProductService } from '../../product/common/productService.js';
 import { join } from '../../../base/common/path.js';
 import { memoize } from '../../../base/common/decorators.js';
 import * as performance from '../../../base/common/performance.js';
 import pkg from '@xterm/headless';
 import { AutoRepliesPtyServiceContribution } from './terminalContrib/autoReplies/autoRepliesContribController.js';
+import { UplinkTerminalProcess } from './uplink/uplinkTerminalProcess.js';
 
 type XtermTerminal = pkg.Terminal;
 const { Terminal: XtermTerminal } = pkg;
@@ -131,7 +142,6 @@ export class PtyService extends Disposable implements IPtyService {
 
 	constructor(
 		private readonly _logService: ILogService,
-		private readonly _productService: IProductService,
 		private readonly _reconnectConstants: IReconnectConstants,
 		private readonly _simulatedLatency: number
 	) {
@@ -308,7 +318,10 @@ export class PtyService extends Disposable implements IPtyService {
 			throw new Error('Attempt to create a process when attach object was provided');
 		}
 		const id = ++this._lastPtyId;
-		const process = new TerminalProcess(shellLaunchConfig, cwd, cols, rows, env, executableEnv, options, this._logService, this._productService);
+
+		// Use Rust PTY service
+		const process = new UplinkTerminalProcess(shellLaunchConfig, cwd, cols, rows, env, this._logService);
+
 		const processLaunchOptions: IPersistentTerminalProcessLaunchConfig = {
 			env,
 			executableEnv,
@@ -730,7 +743,7 @@ class PersistentTerminalProcess extends Disposable {
 
 	constructor(
 		private _persistentProcessId: number,
-		private readonly _terminalProcess: TerminalProcess,
+		private readonly _terminalProcess: IExtendedTerminalProcess,
 		readonly workspaceId: string,
 		readonly workspaceName: string,
 		readonly shouldPersistTerminal: boolean,
