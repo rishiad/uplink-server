@@ -153,7 +153,7 @@ async fn send_msg<T: serde::Serialize>(
     tag: u8,
     msg: &T,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let data = rmp_serde::to_vec(msg)?;
+    let data = rmp_serde::to_vec_named(msg)?;  // Use named fields for JS compatibility
     let mut sock = sock.lock().await;
     sock.write_all(&[tag]).await?;
     sock.write_all(&(data.len() as u32).to_be_bytes()).await?;
