@@ -1,0 +1,17 @@
+[package]
+name = "uplink-pty"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "uplink-pty"
+path = "src/main.rs"
+
+[dependencies]
+portable-pty = "0.8"
+tokio = { version = "1", features = ["net", "io-util", "rt-multi-thread", "macros", "sync"] }
+serde = { version = "1", features = ["derive"] }
+rmp-serde = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
