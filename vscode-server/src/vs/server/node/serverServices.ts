@@ -51,6 +51,7 @@ import { IUriIdentityService } from '../../platform/uriIdentity/common/uriIdenti
 import { UriIdentityService } from '../../platform/uriIdentity/common/uriIdentityService.js';
 import { RemoteAgentEnvironmentChannel } from './remoteAgentEnvironmentImpl.js';
 import { RemoteAgentFileSystemProviderChannel } from './remoteFileSystemProviderServer.js';
+import { UplinkFileSystemProviderChannel } from '../../platform/files/node/uplink/uplinkFileSystemProviderChannel.js';
 import { ServerTelemetryChannel } from '../../platform/telemetry/common/remoteTelemetryChannel.js';
 import { IServerTelemetryService, ServerNullTelemetryService, ServerTelemetryService } from '../../platform/telemetry/common/serverTelemetryService.js';
 import { RemoteTerminalChannel } from './remoteTerminalChannel.js';
@@ -239,7 +240,8 @@ export async function setupServerServices(connectionToken: ServerConnectionToken
 
 		socketServer.registerChannel(NativeMcpDiscoveryHelperChannelName, instantiationService.createInstance(NativeMcpDiscoveryHelperChannel, (ctx: RemoteAgentConnectionContext) => getUriTransformer(ctx.remoteAuthority)));
 
-		const remoteFileSystemChannel = disposables.add(new RemoteAgentFileSystemProviderChannel(logService, environmentService, configurationService));
+		// Use Rust uplink-fs service instead of Node.js DiskFileSystemProvider
+		const remoteFileSystemChannel = disposables.add(new UplinkFileSystemProviderChannel(logService));
 		socketServer.registerChannel(REMOTE_FILE_SYSTEM_CHANNEL_NAME, remoteFileSystemChannel);
 
 		socketServer.registerChannel('request', new RequestChannel(accessor.get(IRequestService)));
