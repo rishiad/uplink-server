@@ -34,17 +34,18 @@ let uplinkPtyProcess: ChildProcess | null = null;
 
 /** Start the uplink-pty Rust service */
 async function startUplinkPty(logService: { info: (msg: string) => void; error: (msg: string, err?: any) => void }): Promise<void> {
-	// Find uplink-pty binary relative to server root
-	// ESM doesn't have __dirname, so we derive it from import.meta.url
-	const currentFile = fileURLToPath(import.meta.url);
-	const currentDir = path.dirname(currentFile);
-	// From out/vs/platform/terminal/node/ -> server root
-	const serverRoot = path.resolve(currentDir, '../../../../..');
-	const uplinkPtyPath = path.join(serverRoot, 'bin', 'uplink-pty');
+	// Find uplink-pty binary: check env var first, then fall back to relative path
+	let uplinkPtyPath = process.env.UPLINK_PTY_PATH;
 
-	console.log(`[uplink-pty] currentFile: ${currentFile}`);
-	console.log(`[uplink-pty] serverRoot: ${serverRoot}`);
-	console.log(`[uplink-pty] Looking for binary at: ${uplinkPtyPath}`);
+	if (!uplinkPtyPath) {
+		// Fall back to relative path from build output
+		const currentFile = fileURLToPath(import.meta.url);
+		const currentDir = path.dirname(currentFile);
+		const serverRoot = path.resolve(currentDir, '../../../../..');
+		uplinkPtyPath = path.join(serverRoot, 'bin', 'uplink-pty');
+	}
+
+	console.log(`[uplink-pty] Binary path: ${uplinkPtyPath}`);
 	console.log(`[uplink-pty] Binary exists: ${fs.existsSync(uplinkPtyPath)}`);
 
 	if (!fs.existsSync(uplinkPtyPath)) {
@@ -52,12 +53,18 @@ async function startUplinkPty(logService: { info: (msg: string) => void; error: 
 	}
 
 	return new Promise((resolve, reject) => {
+		let timeoutId: NodeJS.Timeout | null = null;
+
 		uplinkPtyProcess = spawn(uplinkPtyPath, [], {
 			stdio: ['ignore', 'pipe', 'pipe'],
 			detached: false
 		});
 
 		uplinkPtyProcess.on('error', (err) => {
+			if (timeoutId) {
+				clearTimeout(timeoutId);
+				timeoutId = null;
+			}
 			reject(new Error(`Failed to start uplink-pty: ${err.message}`));
 		});
 
@@ -66,12 +73,12 @@ async function startUplinkPty(logService: { info: (msg: string) => void; error: 
 		});
 
 		// Wait for "listening" message or timeout
-		let started = false;
 		uplinkPtyProcess.stdout?.on('data', (data: Buffer) => {
 			const msg = data.toString();
 			logService.info(`[uplink-pty] ${msg.trim()}`);
-			if (!started && msg.includes('listening')) {
-				started = true;
+			if (timeoutId && msg.includes('listening')) {
+				clearTimeout(timeoutId);
+				timeoutId = null;
 				resolve();
 			}
 		});
@@ -81,10 +88,9 @@ async function startUplinkPty(logService: { info: (msg: string) => void; error: 
 		});
 
 		// Timeout after 5 seconds
-		setTimeout(() => {
-			if (!started) {
-				reject(new Error('uplink-pty failed to start within 5 seconds'));
-			}
+		timeoutId = setTimeout(() => {
+			timeoutId = null;
+			reject(new Error('uplink-pty failed to start within 5 seconds'));
 		}, 5000);
 	});
 }

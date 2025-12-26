@@ -246,7 +246,3 @@ impl std::fmt::Display for SendError {
 }
 
 impl std::error::Error for SendError {}
-
-// SendError is Send + Sync because it only contains String which is Send + Sync
-unsafe impl Send for SendError {}
-unsafe impl Sync for SendError {}

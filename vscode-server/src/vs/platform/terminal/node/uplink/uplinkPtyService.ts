@@ -32,6 +32,29 @@ import { UplinkPtyClient } from './uplinkPtyClient.js';
 
 const UPLINK_SOCKET_PATH = '/tmp/uplink-pty.sock';
 
+// Allowed shells whitelist for security
+const ALLOWED_SHELLS = new Set([
+	'/bin/bash',
+	'/bin/sh',
+	'/bin/zsh',
+	'/bin/fish',
+	'/bin/dash',
+	'/bin/tcsh',
+	'/bin/csh',
+	'/bin/ksh',
+	'/usr/bin/bash',
+	'/usr/bin/sh',
+	'/usr/bin/zsh',
+	'/usr/bin/fish',
+	'/usr/local/bin/bash',
+	'/usr/local/bin/zsh',
+	'/usr/local/bin/fish',
+]);
+
+function isAllowedShell(shell: string): boolean {
+	return ALLOWED_SHELLS.has(shell);
+}
+
 interface TerminalState {
 	cwd: string;
 	initialCwd: string;
@@ -144,8 +167,13 @@ export class UplinkPtyService extends Disposable implements IPtyHostService {
 		const client = await this._getClient();
 		const id = this._nextId++;
 
+		const shell = shellLaunchConfig.executable || '/bin/bash';
+		if (!isAllowedShell(shell)) {
+			throw new Error(`Shell not allowed: ${shell}`);
+		}
+
 		const result = await client.create({
-			shell: shellLaunchConfig.executable || '/bin/bash',
+			shell,
 			args: (shellLaunchConfig.args as string[]) || [],
 			cwd,
 			env: env as Record<string, string>,

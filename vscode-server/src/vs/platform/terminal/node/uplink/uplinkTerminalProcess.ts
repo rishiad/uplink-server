@@ -128,7 +128,9 @@ export class UplinkTerminalProcess extends Disposable implements ITerminalChildP
 		if (this._client) {
 			this._client.off('data', this._dataHandler);
 			this._client.off('exit', this._exitHandler);
-			this._client.kill(this._terminalId).catch(() => {});
+			this._client.kill(this._terminalId).catch(err => {
+				this._logService.error('UplinkTerminalProcess shutdown error:', err);
+			});
 		}
 	}
 
@@ -151,7 +153,17 @@ export class UplinkTerminalProcess extends Disposable implements ITerminalChildP
 	getInitialCwd(): Promise<string> { return Promise.resolve(this._cwd); }
 	getCwd(): Promise<string> { return Promise.resolve(this._cwd); }
 	async refreshProperty<T extends ProcessPropertyType>(type: T): Promise<IProcessPropertyMap[T]> {
-		return this._cwd as IProcessPropertyMap[T];
+		switch (type) {
+			case ProcessPropertyType.Cwd:
+			case ProcessPropertyType.InitialCwd:
+				return this._cwd as IProcessPropertyMap[T];
+			case ProcessPropertyType.Title:
+				return this._currentTitle as IProcessPropertyMap[T];
+			case ProcessPropertyType.HasChildProcesses:
+				return true as IProcessPropertyMap[T];
+			default:
+				throw new Error(`Unsupported property type: ${type}`);
+		}
 	}
 	async updateProperty<T extends ProcessPropertyType>(type: T, value: IProcessPropertyMap[T]): Promise<void> {}
 	clearUnacknowledgedChars(): void {}
