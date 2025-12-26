@@ -91,11 +91,14 @@ export class UplinkTerminalProcess extends Disposable implements ITerminalChildP
 	async start(): Promise<ITerminalLaunchError | ITerminalLaunchResult | undefined> {
 		try {
 			this._client = await getSharedClient();
+		} catch (err) {
+			return { message: `Failed to connect to uplink-pty socket: ${(err as Error).message}` };
+		}
 
-			// Register handlers for this terminal
-			this._client.on('data', this._dataHandler);
-			this._client.on('exit', this._exitHandler);
+		this._client.on('data', this._dataHandler);
+		this._client.on('exit', this._exitHandler);
 
+		try {
 			const result: CreatedResponse = await this._client.create({
 				shell: this.shellLaunchConfig.executable || '/bin/bash',
 				args: (this.shellLaunchConfig.args as string[]) || [],
@@ -117,7 +120,7 @@ export class UplinkTerminalProcess extends Disposable implements ITerminalChildP
 
 			return undefined;
 		} catch (err) {
-			return { message: `Failed to connect to uplink-pty: ${(err as Error).message}` };
+			return { message: `Failed to create terminal process: ${(err as Error).message}` };
 		}
 	}
 

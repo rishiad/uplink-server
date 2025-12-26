@@ -61,13 +61,18 @@ export class UplinkPtyClient extends EventEmitter {
 
 	async connect(): Promise<void> {
 		return new Promise((resolve, reject) => {
+			let connected = false;
 			this.socket = net.createConnection(this.socketPath, () => {
+				connected = true;
 				resolve();
 			});
 
 			this.socket.on('error', (err) => {
-				reject(err);
-				this.emit('error', err);
+				if (!connected) {
+					reject(err);
+				} else {
+					this.emit('error', err);
+				}
 			});
 
 			this.socket.on('close', () => {

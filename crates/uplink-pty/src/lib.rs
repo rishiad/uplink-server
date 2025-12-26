@@ -215,16 +215,38 @@ async fn handle_requests(
 }
 
 /// Send a tagged MessagePack message to the client
+/// Returns a specific error type to allow callers to handle write failures appropriately
 async fn send_msg<T: serde::Serialize>(
     sock: &Arc<Mutex<tokio::net::unix::OwnedWriteHalf>>,
     tag: u8,
     msg: &T,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let data = rmp_serde::to_vec_named(msg)?;
+) -> Result<(), SendError> {
+    let data = rmp_serde::to_vec_named(msg).map_err(|e| SendError::Serialize(e.to_string()))?;
     debug!(tag, len = data.len(), "Sending message");
     let mut sock = sock.lock().await;
-    sock.write_all(&[tag]).await?;
-    sock.write_all(&(data.len() as u32).to_be_bytes()).await?;
-    sock.write_all(&data).await?;
+    sock.write_all(&[tag]).await.map_err(|e| SendError::Write(e.to_string()))?;
+    sock.write_all(&(data.len() as u32).to_be_bytes()).await.map_err(|e| SendError::Write(e.to_string()))?;
+    sock.write_all(&data).await.map_err(|e| SendError::Write(e.to_string()))?;
     Ok(())
 }
+
+#[derive(Debug)]
+enum SendError {
+    Serialize(String),
+    Write(String),
+}
+
+impl std::fmt::Display for SendError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SendError::Serialize(e) => write!(f, "serialization failed: {}", e),
+            SendError::Write(e) => write!(f, "socket write failed: {}", e),
+        }
+    }
+}
+
+impl std::error::Error for SendError {}
+
+// SendError is Send + Sync because it only contains String which is Send + Sync
+unsafe impl Send for SendError {}
+unsafe impl Sync for SendError {}
