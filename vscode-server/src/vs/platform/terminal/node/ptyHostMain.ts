@@ -53,7 +53,7 @@ async function startUplinkPty(logService: { info: (msg: string) => void; error: 
 	}
 
 	return new Promise((resolve, reject) => {
-		let timeoutId: NodeJS.Timeout | null = null;
+		let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
 		uplinkPtyProcess = spawn(uplinkPtyPath, [], {
 			stdio: ['ignore', 'pipe', 'pipe'],
