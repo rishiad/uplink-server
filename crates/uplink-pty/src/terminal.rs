@@ -1,6 +1,6 @@
 //! Terminal management using portable-pty
 
-use portable_pty::{native_pty_system, Child, CommandBuilder, PtySize};
+use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use tokio::sync::mpsc;
@@ -8,6 +8,7 @@ use tokio::sync::mpsc;
 /// A running terminal instance
 pub struct Terminal {
     writer: Box<dyn Write + Send>,
+    master: Box<dyn MasterPty + Send>,
     _child: Box<dyn Child + Send + Sync>,
 }
 
@@ -17,10 +18,14 @@ impl Terminal {
         self.writer.write_all(data)
     }
 
-    /// Resize the terminal 
-    pub fn resize(&self, _cols: u16, _rows: u16) -> std::io::Result<()> {
-        // TODO: Store master PTY handle to support resize
-        Ok(())
+    /// Resize the terminal
+    pub fn resize(&self, cols: u16, rows: u16) -> std::io::Result<()> {
+        self.master.resize(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        }).map_err(|e| std::io::Error::other(e.to_string()))
     }
 }
 
@@ -102,6 +107,7 @@ impl TerminalRegistry {
             id,
             Terminal {
                 writer,
+                master: pair.master,
                 _child: child,
             },
         );

@@ -49,9 +49,11 @@ export class UplinkTerminalProcess extends Disposable implements ITerminalChildP
 	private _client: UplinkPtyClient | null = null;
 	private _terminalId: number = 0;
 	private _pid: number = 0;
-	private _currentTitle: string = '';
+	/** Initial title based on shell name - not dynamically updated from PTY */
+	private _initialTitle: string = '';
 
-	get currentTitle(): string { return this._currentTitle; }
+	/** Returns the initial title (shell name). Note: Dynamic title updates from PTY are not supported. */
+	get currentTitle(): string { return this._initialTitle; }
 	get shellType(): TerminalShellType | undefined { return undefined; }
 	get hasChildProcesses(): boolean { return true; }
 	get exitMessage(): string | undefined { return undefined; }
@@ -110,7 +112,7 @@ export class UplinkTerminalProcess extends Disposable implements ITerminalChildP
 
 			this._terminalId = result.terminal_id;
 			this._pid = result.pid;
-			this._currentTitle = this.shellLaunchConfig.executable || 'terminal';
+			this._initialTitle = this.shellLaunchConfig.executable || 'terminal';
 
 			this._onProcessReady.fire({
 				pid: this._pid,
@@ -158,7 +160,7 @@ export class UplinkTerminalProcess extends Disposable implements ITerminalChildP
 			case ProcessPropertyType.InitialCwd:
 				return this._cwd as IProcessPropertyMap[T];
 			case ProcessPropertyType.Title:
-				return this._currentTitle as IProcessPropertyMap[T];
+				return this._initialTitle as IProcessPropertyMap[T];
 			case ProcessPropertyType.HasChildProcesses:
 				return true as IProcessPropertyMap[T];
 			default:
