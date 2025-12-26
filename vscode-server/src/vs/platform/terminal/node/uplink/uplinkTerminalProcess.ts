@@ -22,6 +22,29 @@ import { UplinkPtyClient, CreatedResponse } from './uplinkPtyClient.js';
 
 const UPLINK_SOCKET_PATH = '/tmp/uplink-pty.sock';
 
+// Allowed shells whitelist for security
+const ALLOWED_SHELLS = new Set([
+	'/bin/bash',
+	'/bin/sh',
+	'/bin/zsh',
+	'/bin/fish',
+	'/bin/dash',
+	'/bin/tcsh',
+	'/bin/csh',
+	'/bin/ksh',
+	'/usr/bin/bash',
+	'/usr/bin/sh',
+	'/usr/bin/zsh',
+	'/usr/bin/fish',
+	'/usr/local/bin/bash',
+	'/usr/local/bin/zsh',
+	'/usr/local/bin/fish',
+]);
+
+function isAllowedShell(shell: string): boolean {
+	return ALLOWED_SHELLS.has(shell);
+}
+
 // Singleton client shared by all terminal instances
 let sharedClient: UplinkPtyClient | null = null;
 let sharedClientPromise: Promise<UplinkPtyClient> | null = null;
@@ -101,8 +124,13 @@ export class UplinkTerminalProcess extends Disposable implements ITerminalChildP
 		this._client.on('exit', this._exitHandler);
 
 		try {
+			const shell = this.shellLaunchConfig.executable || '/bin/bash';
+			if (!isAllowedShell(shell)) {
+				return { message: `Shell not allowed: ${shell}` };
+			}
+
 			const result: CreatedResponse = await this._client.create({
-				shell: this.shellLaunchConfig.executable || '/bin/bash',
+				shell,
 				args: (this.shellLaunchConfig.args as string[]) || [],
 				cwd: this._cwd,
 				env: this._env as Record<string, string>,
