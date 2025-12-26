@@ -100,6 +100,7 @@ export class UplinkPtyClient extends EventEmitter {
 
 	private handleMessage(tag: number, payload: Buffer): void {
 		const msg = decode(payload) as any;
+		console.log(`[UplinkPtyClient] handleMessage tag=${tag}`, msg);
 
 		switch (tag) {
 			case MSG_CREATED: {
@@ -155,6 +156,7 @@ export class UplinkPtyClient extends EventEmitter {
 	}
 
 	async input(terminalId: number, data: Buffer): Promise<void> {
+		console.log(`[UplinkPtyClient] input terminalId=${terminalId} data.length=${data.length}`);
 		const id = this.nextId++;
 		await this.request(MSG_INPUT, { id, terminal_id: terminalId, data: Array.from(data) }, id);
 	}
