@@ -26,7 +26,6 @@ import { ExtensionManagementChannel } from '../../platform/extensionManagement/c
 import { ExtensionManagementService, INativeServerExtensionManagementService } from '../../platform/extensionManagement/node/extensionManagementService.js';
 import { IFileService } from '../../platform/files/common/files.js';
 import { FileService } from '../../platform/files/common/fileService.js';
-import { DiskFileSystemProvider } from '../../platform/files/node/diskFileSystemProvider.js';
 import { SyncDescriptor } from '../../platform/instantiation/common/descriptors.js';
 import { IInstantiationService } from '../../platform/instantiation/common/instantiation.js';
 import { InstantiationService } from '../../platform/instantiation/common/instantiationService.js';
@@ -50,8 +49,8 @@ import { UplinkPtyService } from '../../platform/terminal/node/uplink/uplinkPtyS
 import { IUriIdentityService } from '../../platform/uriIdentity/common/uriIdentity.js';
 import { UriIdentityService } from '../../platform/uriIdentity/common/uriIdentityService.js';
 import { RemoteAgentEnvironmentChannel } from './remoteAgentEnvironmentImpl.js';
-import { RemoteAgentFileSystemProviderChannel } from './remoteFileSystemProviderServer.js';
 import { UplinkFileSystemProviderChannel } from '../../platform/files/node/uplink/uplinkFileSystemProviderChannel.js';
+import { UplinkFileSystemProvider } from '../../platform/files/node/uplink/uplinkFileSystemProvider.js';
 import { ServerTelemetryChannel } from '../../platform/telemetry/common/remoteTelemetryChannel.js';
 import { IServerTelemetryService, ServerNullTelemetryService, ServerTelemetryService } from '../../platform/telemetry/common/serverTelemetryService.js';
 import { RemoteTerminalChannel } from './remoteTerminalChannel.js';
@@ -93,8 +92,75 @@ import { McpManagementChannel } from '../../platform/mcp/common/mcpManagementIpc
 import { AllowedMcpServersService } from '../../platform/mcp/common/allowedMcpServersService.js';
 import { IMcpGalleryManifestService } from '../../platform/mcp/common/mcpGalleryManifest.js';
 import { McpGalleryManifestIPCService } from '../../platform/mcp/common/mcpGalleryManifestServiceIpc.js';
+import { ChildProcess, spawn } from 'child_process';
+import * as fs from 'fs';
+import { fileURLToPath } from 'url';
 
 const eventPrefix = 'monacoworkbench';
+
+let uplinkFsProcess: ChildProcess | null = null;
+
+/** Start the uplink-fs Rust service */
+async function startUplinkFs(logService: ILogService): Promise<void> {
+	let uplinkFsPath = process.env.UPLINK_FS_PATH;
+
+	if (!uplinkFsPath) {
+		// In bundled output, __dirname equivalent from import.meta.url
+		// The binary is at <server-root>/bin/uplink-fs
+		const currentFile = fileURLToPath(import.meta.url);
+		const currentDir = path.dirname(currentFile);
+		// From out/server-main.js, go up to server root
+		const serverRoot = path.resolve(currentDir, '..');
+		uplinkFsPath = path.join(serverRoot, 'bin', 'uplink-fs');
+	}
+
+	console.log(`[uplink-fs] Binary path: ${uplinkFsPath}`);
+	console.log(`[uplink-fs] Binary exists: ${fs.existsSync(uplinkFsPath)}`);
+
+	if (!fs.existsSync(uplinkFsPath)) {
+		throw new Error(`uplink-fs binary not found at ${uplinkFsPath}`);
+	}
+
+	return new Promise((resolve, reject) => {
+		let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+		uplinkFsProcess = spawn(uplinkFsPath, [], {
+			stdio: ['ignore', 'pipe', 'pipe'],
+			detached: false
+		});
+
+		uplinkFsProcess.on('error', (err) => {
+			if (timeoutId) {
+				clearTimeout(timeoutId);
+				timeoutId = null;
+			}
+			reject(new Error(`Failed to start uplink-fs: ${err.message}`));
+		});
+
+		uplinkFsProcess.on('exit', (code) => {
+			logService.error(`[uplink-fs] exited with code ${code}`);
+		});
+
+		uplinkFsProcess.stdout?.on('data', (data: Buffer) => {
+			const msg = data.toString();
+			logService.info(`[uplink-fs] ${msg.trim()}`);
+			if (timeoutId && msg.includes('listening')) {
+				clearTimeout(timeoutId);
+				timeoutId = null;
+				resolve();
+			}
+		});
+
+		uplinkFsProcess.stderr?.on('data', (data: Buffer) => {
+			logService.error(`[uplink-fs] ${data.toString().trim()}`);
+		});
+
+		timeoutId = setTimeout(() => {
+			timeoutId = null;
+			reject(new Error('uplink-fs failed to start within 5 seconds'));
+		}, 5000);
+	});
+}
 
 export async function setupServerServices(connectionToken: ServerConnectionToken, args: ServerParsedArgs, REMOTE_DATA_FOLDER: string, disposables: DisposableStore) {
 	const services = new ServiceCollection();
@@ -123,16 +189,34 @@ export async function setupServerServices(connectionToken: ServerConnectionToken
 		logService.info(`\n\n${productService.serverGreeting.join('\n')}\n\n`);
 	}
 
+	// Start uplink-fs Rust service
+	console.log('[uplink-fs] Attempting to start...');
+	try {
+		await startUplinkFs(logService);
+		console.log('[uplink-fs] started successfully');
+		logService.info('[uplink-fs] started successfully');
+		disposables.add(toDisposable(() => {
+			if (uplinkFsProcess) {
+				uplinkFsProcess.kill();
+				uplinkFsProcess = null;
+			}
+		}));
+	} catch (err) {
+		console.error('[uplink-fs] Failed to start:', err);
+		logService.error('[uplink-fs] Failed to start:', err);
+		// Continue without uplink-fs - will fall back to error on first fs operation
+	}
+
 	// ExtensionHost Debug broadcast service
 	socketServer.registerChannel(ExtensionHostDebugBroadcastChannel.ChannelName, new ExtensionHostDebugBroadcastChannel());
 
 	// TODO: @Sandy @Joao need dynamic context based router
 	const router = new StaticRouter<RemoteAgentConnectionContext>(ctx => ctx.clientId === 'renderer');
 
-	// Files
+	// Files - use Rust uplink-fs service
 	const fileService = disposables.add(new FileService(logService));
 	services.set(IFileService, fileService);
-	fileService.registerProvider(Schemas.file, disposables.add(new DiskFileSystemProvider(logService)));
+	fileService.registerProvider(Schemas.file, disposables.add(new UplinkFileSystemProvider(logService)));
 
 	// URI Identity
 	const uriIdentityService = new UriIdentityService(fileService);
@@ -370,6 +454,9 @@ function twodigits(n: number): string {
 async function cleanupOlderLogs(logsPath: string): Promise<void> {
 	const currentLog = path.basename(logsPath);
 	const logsRoot = path.dirname(logsPath);
+	if (!fs.existsSync(logsRoot)) {
+		return;
+	}
 	const children = await Promises.readdir(logsRoot);
 	const allSessions = children.filter(name => /^\d{8}T\d{6}$/.test(name));
 	const oldSessions = allSessions.sort().filter((d) => d !== currentLog);

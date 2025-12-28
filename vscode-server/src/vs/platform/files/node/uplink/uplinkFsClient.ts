@@ -156,6 +156,7 @@ export class UplinkFsClient extends EventEmitter {
 	}
 
 	async stat(path: string): Promise<StatResult> {
+		console.log(`[UplinkFsClient] stat: ${path}`);
 		const id = this.nextId++;
 		const result = await this.request<any>(MSG_STAT, { id, path }, id);
 		return {
@@ -167,6 +168,7 @@ export class UplinkFsClient extends EventEmitter {
 	}
 
 	async readFile(path: string): Promise<Uint8Array> {
+		console.log(`[UplinkFsClient] readFile: ${path}`);
 		const id = this.nextId++;
 		const result = await this.request<any>(MSG_READ_FILE, { id, path }, id);
 		return new Uint8Array(result.data);
@@ -193,6 +195,7 @@ export class UplinkFsClient extends EventEmitter {
 	}
 
 	async readDir(path: string): Promise<Array<[string, number]>> {
+		console.log(`[UplinkFsClient] readDir: ${path}`);
 		const id = this.nextId++;
 		const result = await this.request<any>(MSG_READ_DIR, { id, path }, id);
 		return result.entries.map((e: DirEntry) => [e.name, e.file_type] as [string, number]);

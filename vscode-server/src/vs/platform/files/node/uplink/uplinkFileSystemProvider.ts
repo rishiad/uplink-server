@@ -5,10 +5,13 @@
 import { Emitter, Event } from '../../../../base/common/event.js';
 import { Disposable, IDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
 import { URI } from '../../../../base/common/uri.js';
-import { FileSystemProviderCapabilities, FileSystemProviderErrorCode, FileType, IFileChange, IFileDeleteOptions, IFileOverwriteOptions, IFileSystemProviderWithFileReadWriteCapability, IFileSystemProviderWithFileFolderCopyCapability, IFileWriteOptions, IStat, createFileSystemProviderError, IWatchOptions, IFileAtomicReadOptions, IFileSystemProviderWithFileRealpathCapability } from '../../common/files.js';
+import { FileSystemProviderCapabilities, FileSystemProviderErrorCode, FileType, IFileChange, IFileDeleteOptions, IFileOverwriteOptions, IFileSystemProviderWithFileReadWriteCapability, IFileSystemProviderWithFileFolderCopyCapability, IFileWriteOptions, IStat, createFileSystemProviderError, IWatchOptions, IFileAtomicReadOptions, IFileSystemProviderWithFileRealpathCapability, IFileReadStreamOptions } from '../../common/files.js';
 import { ILogService } from '../../../log/common/log.js';
 import { UplinkFsClient, FileChange } from './uplinkFsClient.js';
 import { isLinux } from '../../../../base/common/platform.js';
+import { ReadableStreamEvents, newWriteableStream } from '../../../../base/common/stream.js';
+import { VSBuffer } from '../../../../base/common/buffer.js';
+import { CancellationToken } from '../../../../base/common/cancellation.js';
 
 const SOCKET_PATH = '/tmp/uplink-fs.sock';
 
@@ -137,6 +140,45 @@ export class UplinkFileSystemProvider extends Disposable implements
 			return await client.readFile(resource.fsPath);
 		} catch (error) {
 			throw this.toFileSystemProviderError(error);
+		}
+	}
+
+	readFileStream(resource: URI, opts: IFileReadStreamOptions, token: CancellationToken): ReadableStreamEvents<Uint8Array> {
+		const stream = newWriteableStream<Uint8Array>(data => VSBuffer.concat(data.map(d => VSBuffer.wrap(d))).buffer);
+
+		this.doReadFileStream(resource, opts, token, stream);
+
+		return stream;
+	}
+
+	private async doReadFileStream(resource: URI, opts: IFileReadStreamOptions, token: CancellationToken, stream: ReturnType<typeof newWriteableStream<Uint8Array>>): Promise<void> {
+		try {
+			if (token.isCancellationRequested) {
+				stream.end();
+				return;
+			}
+
+			const client = await this.ensureConnected();
+			const data = await client.readFile(resource.fsPath);
+
+			if (token.isCancellationRequested) {
+				stream.end();
+				return;
+			}
+
+			// Handle position/length options
+			let result = data;
+			if (opts.position !== undefined || opts.length !== undefined) {
+				const start = opts.position ?? 0;
+				const end = opts.length !== undefined ? start + opts.length : data.length;
+				result = data.slice(start, end);
+			}
+
+			stream.write(result);
+			stream.end();
+		} catch (error) {
+			stream.error(this.toFileSystemProviderError(error));
+			stream.end();
 		}
 	}
 
