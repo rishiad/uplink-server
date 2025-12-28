@@ -43,7 +43,7 @@ export class SwitchRemoteViewItem extends Disposable {
 		this.switchRemoteMenu = MenuId.for('workbench.remote.menu.switchRemoteMenu');
 		this._register(MenuRegistry.appendMenuItem(MenuId.ViewContainerTitle, {
 			submenu: this.switchRemoteMenu,
-			title: nls.localize('switchRemote.label', "Switch Remote"),
+			title: nls.localize('switchRemote.label', "Switch Uplink"),
 			group: 'navigation',
 			when: ContextKeyExpr.equals('viewContainer', VIEWLET_ID),
 			order: 1,

@@ -19,6 +19,12 @@ const MSG_MKDIR = 8;
 const MSG_WATCH = 9;
 const MSG_UNWATCH = 10;
 const MSG_REALPATH = 11;
+const MSG_OPEN = 12;
+const MSG_CLOSE = 13;
+const MSG_READ_HANDLE = 14;
+const MSG_WRITE_HANDLE = 15;
+const MSG_CLONE_FILE = 16;
+const MSG_READ_DIR_STATS = 17;
 
 const MSG_OK = 20;
 const MSG_ERROR = 21;
@@ -26,6 +32,9 @@ const MSG_STAT_RESULT = 22;
 const MSG_DATA = 23;
 const MSG_DIR_ENTRIES = 24;
 const MSG_REALPATH_RESULT = 25;
+const MSG_OPEN_RESULT = 26;
+const MSG_READ_RESULT = 27;
+const MSG_DIR_STATS = 28;
 
 const MSG_FILE_CHANGE = 30;
 const MSG_WATCH_ERROR = 31;
@@ -114,7 +123,10 @@ export class UplinkFsClient extends EventEmitter {
 			case MSG_STAT_RESULT:
 			case MSG_DATA:
 			case MSG_DIR_ENTRIES:
-			case MSG_REALPATH_RESULT: {
+			case MSG_REALPATH_RESULT:
+			case MSG_OPEN_RESULT:
+			case MSG_READ_RESULT:
+			case MSG_DIR_STATS: {
 				const pending = this.pending.get(msg.id);
 				pending?.resolve(msg);
 				this.pending.delete(msg.id);
@@ -122,7 +134,9 @@ export class UplinkFsClient extends EventEmitter {
 			}
 			case MSG_ERROR: {
 				const pending = this.pending.get(msg.id);
-				pending?.reject(new Error(msg.message));
+				const error = new Error(msg.message) as any;
+				error.code = msg.code; // Attach error code for client-side mapping
+				pending?.reject(error);
 				this.pending.delete(msg.id);
 				break;
 			}
@@ -201,6 +215,19 @@ export class UplinkFsClient extends EventEmitter {
 		return result.entries.map((e: DirEntry) => [e.name, e.file_type] as [string, number]);
 	}
 
+	async readDirWithStats(path: string): Promise<Array<{ name: string; type: number; ctime: number; mtime: number; size: number }>> {
+		console.log(`[UplinkFsClient] readDirWithStats: ${path}`);
+		const id = this.nextId++;
+		const result = await this.request<any>(MSG_READ_DIR_STATS, { id, path }, id);
+		return result.entries.map((e: any) => ({
+			name: e.name,
+			type: e.file_type,
+			ctime: e.ctime,
+			mtime: e.mtime,
+			size: e.size,
+		}));
+	}
+
 	async mkdir(path: string): Promise<void> {
 		const id = this.nextId++;
 		await this.request(MSG_MKDIR, { id, path }, id);
@@ -220,6 +247,34 @@ export class UplinkFsClient extends EventEmitter {
 		const id = this.nextId++;
 		const result = await this.request<any>(MSG_REALPATH, { id, path }, id);
 		return result.path;
+	}
+
+	async open(path: string, opts: { create: boolean; truncate: boolean }): Promise<number> {
+		const id = this.nextId++;
+		const result = await this.request<any>(MSG_OPEN, { id, path, ...opts }, id);
+		return result.fd;
+	}
+
+	async closeHandle(fd: number): Promise<void> {
+		const id = this.nextId++;
+		await this.request(MSG_CLOSE, { id, fd }, id);
+	}
+
+	async readHandle(fd: number, pos: number, len: number): Promise<{ data: Uint8Array; bytesRead: number }> {
+		const id = this.nextId++;
+		const result = await this.request<any>(MSG_READ_HANDLE, { id, fd, pos, len }, id);
+		return { data: new Uint8Array(result.data), bytesRead: result.bytes_read };
+	}
+
+	async writeHandle(fd: number, pos: number, data: Uint8Array): Promise<number> {
+		const id = this.nextId++;
+		const result = await this.request<any>(MSG_WRITE_HANDLE, { id, fd, pos, data: Array.from(data) }, id);
+		return result.bytes_written;
+	}
+
+	async cloneFile(srcPath: string, destPath: string): Promise<void> {
+		const id = this.nextId++;
+		await this.request(MSG_CLONE_FILE, { id, src_path: srcPath, dest_path: destPath }, id);
 	}
 
 	close(): void {

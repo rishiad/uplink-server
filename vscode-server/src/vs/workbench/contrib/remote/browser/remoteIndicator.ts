@@ -184,7 +184,7 @@ export class RemoteStatusIndicator extends Disposable implements IWorkbenchContr
 	}
 
 	private registerActions(): void {
-		const category = nls.localize2('remote.category', "Remote");
+		const category = nls.localize2('remote.category', "Uplink");
 
 		// Show Remote Menu
 		const that = this;
@@ -193,7 +193,7 @@ export class RemoteStatusIndicator extends Disposable implements IWorkbenchContr
 				super({
 					id: RemoteStatusIndicator.REMOTE_ACTIONS_COMMAND_ID,
 					category,
-					title: nls.localize2('remote.showMenu', "Show Remote Menu"),
+					title: nls.localize2('remote.showMenu', "Show Uplink Menu"),
 					f1: true,
 					keybinding: {
 						weight: KeybindingWeight.WorkbenchContrib,
@@ -211,7 +211,7 @@ export class RemoteStatusIndicator extends Disposable implements IWorkbenchContr
 					super({
 						id: RemoteStatusIndicator.CLOSE_REMOTE_COMMAND_ID,
 						category,
-						title: nls.localize2('remote.close', "Close Remote Connection"),
+						title: nls.localize2('remote.close', "Close Uplink Connection"),
 						f1: true,
 						precondition: ContextKeyExpr.or(RemoteNameContext, VirtualWorkspaceContext)
 					});
@@ -223,7 +223,7 @@ export class RemoteStatusIndicator extends Disposable implements IWorkbenchContr
 					group: '6_close',
 					command: {
 						id: RemoteStatusIndicator.CLOSE_REMOTE_COMMAND_ID,
-						title: nls.localize({ key: 'miCloseRemote', comment: ['&& denotes a mnemonic'] }, "Close Re&&mote Connection")
+						title: nls.localize({ key: 'miCloseRemote', comment: ['&& denotes a mnemonic'] }, "Close Up&&link Connection")
 					},
 					order: 3.5
 				});
@@ -236,7 +236,7 @@ export class RemoteStatusIndicator extends Disposable implements IWorkbenchContr
 					super({
 						id: RemoteStatusIndicator.INSTALL_REMOTE_EXTENSIONS_ID,
 						category,
-						title: nls.localize2('remote.install', "Install Remote Development Extensions"),
+						title: nls.localize2('remote.install', "Install Uplink Extensions"),
 						f1: true
 					});
 				}
@@ -508,7 +508,7 @@ export class RemoteStatusIndicator extends Disposable implements IWorkbenchContr
 			const hostLabel = this.labelService.getHostLabel(Schemas.vscodeRemote, this.remoteAuthority) || this.remoteAuthority;
 			switch (this.connectionState) {
 				case 'initializing':
-					this.renderRemoteStatusIndicator(nls.localize('host.open', "Opening Remote..."), nls.localize('host.open', "Opening Remote..."), undefined, true /* progress */);
+					this.renderRemoteStatusIndicator(nls.localize('host.open', "Opening Uplink..."), nls.localize('host.open', "Opening Uplink..."), undefined, true /* progress */);
 					break;
 				case 'reconnecting':
 					this.renderRemoteStatusIndicator(`${nls.localize('host.reconnecting', "Reconnecting to {0}...", truncate(hostLabel, RemoteStatusIndicator.REMOTE_STATUS_LABEL_MAX_LENGTH))}`, undefined, undefined, true /* progress */);
@@ -555,7 +555,7 @@ export class RemoteStatusIndicator extends Disposable implements IWorkbenchContr
 			}
 		}
 
-		this.renderRemoteStatusIndicator(RemoteStatusIndicator.DEFAULT_REMOTE_STATUS_LABEL, nls.localize('noHost.tooltip', "Open a Remote Window"));
+		this.renderRemoteStatusIndicator(RemoteStatusIndicator.DEFAULT_REMOTE_STATUS_LABEL, nls.localize('noHost.tooltip', "Open an Uplink Window"));
 		return;
 	}
 
@@ -563,7 +563,7 @@ export class RemoteStatusIndicator extends Disposable implements IWorkbenchContr
 		const { text, tooltip, ariaLabel } = this.withNetworkStatus(initialText, initialTooltip, showProgress);
 
 		const properties: IStatusbarEntry = {
-			name: nls.localize('remoteHost', "Remote Host"),
+			name: nls.localize('remoteHost', "Uplink Host"),
 			kind: this.networkState === 'offline' ? 'offline' : text !== RemoteStatusIndicator.DEFAULT_REMOTE_STATUS_LABEL ? 'remote' : undefined, // only emphasize when applicable
 			ariaLabel,
 			text,
@@ -774,7 +774,7 @@ export class RemoteStatusIndicator extends Disposable implements IWorkbenchContr
 					items.push({
 						type: 'item',
 						id: RemoteStatusIndicator.CLOSE_REMOTE_COMMAND_ID,
-						label: nls.localize('closeRemoteConnection.title', 'Close Remote Connection')
+						label: nls.localize('closeRemoteConnection.title', 'Close Uplink Connection')
 					});
 
 					if (this.connectionState === 'disconnected') {
@@ -788,7 +788,7 @@ export class RemoteStatusIndicator extends Disposable implements IWorkbenchContr
 					items.push({
 						type: 'item',
 						id: RemoteStatusIndicator.CLOSE_REMOTE_COMMAND_ID,
-						label: nls.localize('closeVirtualWorkspace.title', 'Close Remote Workspace')
+						label: nls.localize('closeVirtualWorkspace.title', 'Close Uplink Workspace')
 					});
 				}
 			}
@@ -802,7 +802,7 @@ export class RemoteStatusIndicator extends Disposable implements IWorkbenchContr
 
 		const disposables = new DisposableStore();
 		const quickPick = disposables.add(this.quickInputService.createQuickPick({ useSeparators: true }));
-		quickPick.placeholder = nls.localize('remoteActions', "Select an option to open a Remote Window");
+		quickPick.placeholder = nls.localize('remoteActions', "Select an option to open an Uplink Window");
 		quickPick.items = computeItems();
 		quickPick.sortByLabel = false;
 		quickPick.canSelectMany = false;
@@ -868,7 +868,7 @@ Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration)
 		properties: {
 			'workbench.remoteIndicator.showExtensionRecommendations': {
 				type: 'boolean',
-				markdownDescription: nls.localize('remote.showExtensionRecommendations', "When enabled, remote extensions recommendations will be shown in the Remote Indicator menu."),
+				markdownDescription: nls.localize('remote.showExtensionRecommendations', "When enabled, uplink extensions recommendations will be shown in the Uplink Indicator menu."),
 				default: true
 			},
 		}

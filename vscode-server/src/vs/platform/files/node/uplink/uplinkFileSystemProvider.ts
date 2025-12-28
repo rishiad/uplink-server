@@ -5,7 +5,7 @@
 import { Emitter, Event } from '../../../../base/common/event.js';
 import { Disposable, IDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
 import { URI } from '../../../../base/common/uri.js';
-import { FileSystemProviderCapabilities, FileSystemProviderErrorCode, FileType, IFileChange, IFileDeleteOptions, IFileOverwriteOptions, IFileSystemProviderWithFileReadWriteCapability, IFileSystemProviderWithFileFolderCopyCapability, IFileWriteOptions, IStat, createFileSystemProviderError, IWatchOptions, IFileAtomicReadOptions, IFileSystemProviderWithFileRealpathCapability, IFileReadStreamOptions } from '../../common/files.js';
+import { FileSystemProviderCapabilities, FileSystemProviderErrorCode, FileType, IFileChange, IFileDeleteOptions, IFileOverwriteOptions, IFileSystemProviderWithFileReadWriteCapability, IFileSystemProviderWithFileFolderCopyCapability, IFileWriteOptions, IStat, createFileSystemProviderError, IWatchOptions, IFileAtomicReadOptions, IFileSystemProviderWithFileRealpathCapability, IFileReadStreamOptions, IFileSystemProviderWithOpenReadWriteCloseCapability, IFileOpenOptions, IFileSystemProviderWithFileCloneCapability } from '../../common/files.js';
 import { ILogService } from '../../../log/common/log.js';
 import { UplinkFsClient, FileChange } from './uplinkFsClient.js';
 import { isLinux } from '../../../../base/common/platform.js';
@@ -18,7 +18,9 @@ const SOCKET_PATH = '/tmp/uplink-fs.sock';
 export class UplinkFileSystemProvider extends Disposable implements
 	IFileSystemProviderWithFileReadWriteCapability,
 	IFileSystemProviderWithFileFolderCopyCapability,
-	IFileSystemProviderWithFileRealpathCapability {
+	IFileSystemProviderWithFileRealpathCapability,
+	IFileSystemProviderWithOpenReadWriteCloseCapability,
+	IFileSystemProviderWithFileCloneCapability {
 
 	readonly onDidChangeCapabilities = Event.None;
 
@@ -27,7 +29,9 @@ export class UplinkFileSystemProvider extends Disposable implements
 		if (!this._capabilities) {
 			this._capabilities =
 				FileSystemProviderCapabilities.FileReadWrite |
+				FileSystemProviderCapabilities.FileOpenReadWriteClose |
 				FileSystemProviderCapabilities.FileFolderCopy |
+				FileSystemProviderCapabilities.FileClone |
 				FileSystemProviderCapabilities.FileRealpath;
 
 			if (isLinux) {
@@ -101,6 +105,13 @@ export class UplinkFileSystemProvider extends Disposable implements
 	}
 
 	async stat(resource: URI): Promise<IStat> {
+		// Check cache first
+		const cached = this.statCache.get(resource.fsPath);
+		if (cached && cached.expires > Date.now()) {
+			return cached.stat;
+		}
+		this.statCache.delete(resource.fsPath);
+
 		try {
 			const client = await this.ensureConnected();
 			const result = await client.stat(resource.fsPath);
@@ -124,11 +135,26 @@ export class UplinkFileSystemProvider extends Disposable implements
 		}
 	}
 
+	private statCache = new Map<string, { stat: IStat; expires: number }>();
+	private readonly CACHE_TTL = 5000; // 5 seconds
+
 	async readdir(resource: URI): Promise<[string, FileType][]> {
 		try {
 			const client = await this.ensureConnected();
-			const entries = await client.readDir(resource.fsPath);
-			return entries.map(([name, type]) => [name, type as FileType]);
+			const entries = await client.readDirWithStats(resource.fsPath);
+			const now = Date.now();
+			const basePath = resource.fsPath;
+
+			// Cache stat results for each entry
+			for (const e of entries) {
+				const fullPath = basePath.endsWith('/') ? basePath + e.name : basePath + '/' + e.name;
+				this.statCache.set(fullPath, {
+					stat: { type: e.type as FileType, ctime: e.ctime, mtime: e.mtime, size: e.size },
+					expires: now + this.CACHE_TTL,
+				});
+			}
+
+			return entries.map(e => [e.name, e.type as FileType]);
 		} catch (error) {
 			throw this.toFileSystemProviderError(error);
 		}
@@ -230,6 +256,58 @@ export class UplinkFileSystemProvider extends Disposable implements
 		}
 	}
 
+	async cloneFile(from: URI, to: URI): Promise<void> {
+		try {
+			const client = await this.ensureConnected();
+			await client.cloneFile(from.fsPath, to.fsPath);
+		} catch (error) {
+			throw this.toFileSystemProviderError(error);
+		}
+	}
+
+	// File handle operations for streaming
+	async open(resource: URI, opts: IFileOpenOptions): Promise<number> {
+		try {
+			const client = await this.ensureConnected();
+			return await client.open(resource.fsPath, {
+				create: opts.create,
+				truncate: opts.create, // truncate when creating for write
+			});
+		} catch (error) {
+			throw this.toFileSystemProviderError(error);
+		}
+	}
+
+	async close(fd: number): Promise<void> {
+		try {
+			const client = await this.ensureConnected();
+			await client.closeHandle(fd);
+		} catch (error) {
+			throw this.toFileSystemProviderError(error);
+		}
+	}
+
+	async read(fd: number, pos: number, data: Uint8Array, offset: number, length: number): Promise<number> {
+		try {
+			const client = await this.ensureConnected();
+			const result = await client.readHandle(fd, pos, length);
+			data.set(result.data, offset);
+			return result.bytesRead;
+		} catch (error) {
+			throw this.toFileSystemProviderError(error);
+		}
+	}
+
+	async write(fd: number, pos: number, data: Uint8Array, offset: number, length: number): Promise<number> {
+		try {
+			const client = await this.ensureConnected();
+			const chunk = data.subarray(offset, offset + length);
+			return await client.writeHandle(fd, pos, chunk);
+		} catch (error) {
+			throw this.toFileSystemProviderError(error);
+		}
+	}
+
 	watch(resource: URI, opts: IWatchOptions): IDisposable {
 		const watchId = this.watchCounter++;
 		const sessionId = `session-${process.pid}`;
@@ -257,7 +335,23 @@ export class UplinkFileSystemProvider extends Disposable implements
 
 	private toFileSystemProviderError(error: any): Error {
 		const message = error?.message || String(error);
+		const code = error?.code;
 
+		// Use structured error code from Rust if available
+		if (code) {
+			switch (code) {
+				case 'FileNotFound':
+					return createFileSystemProviderError(message, FileSystemProviderErrorCode.FileNotFound);
+				case 'FileExists':
+					return createFileSystemProviderError(message, FileSystemProviderErrorCode.FileExists);
+				case 'NoPermissions':
+					return createFileSystemProviderError(message, FileSystemProviderErrorCode.NoPermissions);
+				case 'FileIsADirectory':
+					return createFileSystemProviderError(message, FileSystemProviderErrorCode.FileIsADirectory);
+			}
+		}
+
+		// Fallback to message-based detection
 		if (message.includes('No such file') || message.includes('ENOENT') || message.includes('not exist')) {
 			return createFileSystemProviderError(message, FileSystemProviderErrorCode.FileNotFound);
 		}

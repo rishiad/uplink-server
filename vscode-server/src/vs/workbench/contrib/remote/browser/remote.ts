@@ -488,7 +488,7 @@ class HelpPanel extends ViewPane {
 					getAriaLabel: (item: HelpItemBase) => {
 						return item.label;
 					},
-					getWidgetAriaLabel: () => nls.localize('remotehelp', "Remote Help")
+					getWidgetAriaLabel: () => nls.localize('remotehelp', "Uplink Help")
 				}
 			}
 		);
@@ -624,7 +624,7 @@ class RemoteViewPaneContainer extends FilterViewPaneContainer implements IViewMo
 	}
 
 	getTitle(): string {
-		const title = nls.localize('remote.explorer', "Remote Explorer");
+		const title = nls.localize('remote.explorer', "Uplink Explorer");
 		return title;
 	}
 }
@@ -632,7 +632,7 @@ class RemoteViewPaneContainer extends FilterViewPaneContainer implements IViewMo
 Registry.as<IViewContainersRegistry>(Extensions.ViewContainersRegistry).registerViewContainer(
 	{
 		id: VIEWLET_ID,
-		title: nls.localize2('remote.explorer', "Remote Explorer"),
+		title: nls.localize2('remote.explorer', "Uplink Explorer"),
 		ctorDescriptor: new SyncDescriptor(RemoteViewPaneContainer),
 		hideIfEmpty: true,
 		viewOrderDelegate: {
