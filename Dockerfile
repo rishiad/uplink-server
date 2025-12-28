@@ -10,7 +10,7 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 WORKDIR /workspace
 COPY crates /workspace/crates
 COPY Cargo.toml Cargo.lock /workspace/
-RUN cargo build --release --package uplink-pty
+RUN cargo build --release --package uplink-pty --package uplink-fs
 
 # Stage 2: Build VSCode server
 FROM ubuntu:22.04
@@ -30,8 +30,9 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /workspace
 
-# Copy Rust binary from first stage
+# Copy Rust binaries from first stage
 COPY --from=rust-builder /workspace/target/release/uplink-pty /workspace/uplink-pty
+COPY --from=rust-builder /workspace/target/release/uplink-fs /workspace/uplink-fs
 
 # Download official VSCode to extract vsda module (pinned version for reproducibility)
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
@@ -68,12 +69,14 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
         mkdir -p ../vscode-server-linux-arm64/node_modules && \
         mkdir -p ../vscode-server-linux-arm64/bin && \
         cp -r /vsda/vsda ../vscode-server-linux-arm64/node_modules/ && \
-        cp /workspace/uplink-pty ../vscode-server-linux-arm64/bin/; \
+        cp /workspace/uplink-pty ../vscode-server-linux-arm64/bin/ && \
+        cp /workspace/uplink-fs ../vscode-server-linux-arm64/bin/; \
     else \
         mkdir -p ../vscode-server-linux-x64/node_modules && \
         mkdir -p ../vscode-server-linux-x64/bin && \
         cp -r /vsda/vsda ../vscode-server-linux-x64/node_modules/ && \
-        cp /workspace/uplink-pty ../vscode-server-linux-x64/bin/; \
+        cp /workspace/uplink-pty ../vscode-server-linux-x64/bin/ && \
+        cp /workspace/uplink-fs ../vscode-server-linux-x64/bin/; \
     fi
 
 # Package the server
