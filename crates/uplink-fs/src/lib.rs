@@ -28,10 +28,12 @@ pub async fn run(socket_path: &Path) -> Result<(), Box<dyn std::error::Error + S
         match listener.accept().await {
             Ok((stream, _)) => {
                 info!("Client connected");
-                if let Err(e) = handle_client(stream).await {
-                    error!(error = %e, "Client error");
-                }
-                info!("Client disconnected");
+                tokio::spawn(async move {
+                    if let Err(e) = handle_client(stream).await {
+                        error!(error = %e, "Client error");
+                    }
+                    info!("Client disconnected");
+                });
             }
             Err(e) => {
                 error!(error = %e, "Accept error");
@@ -98,6 +100,7 @@ async fn handle_requests(
         match tag[0] {
             MSG_STAT => {
                 let req: StatRequest = rmp_serde::from_slice(&msg_buf)?;
+                info!(id = req.id, path = %req.path, "STAT");
                 match ops::stat(&req.path).await {
                     Ok((file_type, ctime, mtime, size)) => {
                         send_msg(&sock_write, MSG_STAT_RESULT, &StatResult {
@@ -111,6 +114,7 @@ async fn handle_requests(
             }
             MSG_READ_FILE => {
                 let req: ReadFileRequest = rmp_serde::from_slice(&msg_buf)?;
+                info!(id = req.id, path = %req.path, "READ_FILE");
                 match ops::read_file(&req.path).await {
                     Ok(data) => {
                         send_msg(&sock_write, MSG_DATA, &DataResponse { id: req.id, data }).await?;
@@ -122,6 +126,7 @@ async fn handle_requests(
             }
             MSG_WRITE_FILE => {
                 let req: WriteFileRequest = rmp_serde::from_slice(&msg_buf)?;
+                info!(id = req.id, path = %req.path, create = req.create, overwrite = req.overwrite, size = req.data.len(), "WRITE_FILE");
                 match ops::write_file(&req.path, &req.data, req.create, req.overwrite).await {
                     Ok(()) => {
                         send_msg(&sock_write, MSG_OK, &OkResponse { id: req.id }).await?;
@@ -133,6 +138,7 @@ async fn handle_requests(
             }
             MSG_DELETE => {
                 let req: DeleteRequest = rmp_serde::from_slice(&msg_buf)?;
+                info!(id = req.id, path = %req.path, recursive = req.recursive, "DELETE");
                 match ops::delete(&req.path, req.recursive).await {
                     Ok(()) => {
                         send_msg(&sock_write, MSG_OK, &OkResponse { id: req.id }).await?;
@@ -144,6 +150,7 @@ async fn handle_requests(
             }
             MSG_RENAME => {
                 let req: RenameRequest = rmp_serde::from_slice(&msg_buf)?;
+                info!(id = req.id, old = %req.old_path, new = %req.new_path, overwrite = req.overwrite, "RENAME");
                 match ops::rename(&req.old_path, &req.new_path, req.overwrite).await {
                     Ok(()) => {
                         send_msg(&sock_write, MSG_OK, &OkResponse { id: req.id }).await?;
@@ -155,6 +162,7 @@ async fn handle_requests(
             }
             MSG_COPY => {
                 let req: CopyRequest = rmp_serde::from_slice(&msg_buf)?;
+                info!(id = req.id, src = %req.src_path, dest = %req.dest_path, overwrite = req.overwrite, "COPY");
                 match ops::copy(&req.src_path, &req.dest_path, req.overwrite).await {
                     Ok(()) => {
                         send_msg(&sock_write, MSG_OK, &OkResponse { id: req.id }).await?;
@@ -166,6 +174,7 @@ async fn handle_requests(
             }
             MSG_READ_DIR => {
                 let req: ReadDirRequest = rmp_serde::from_slice(&msg_buf)?;
+                info!(id = req.id, path = %req.path, "READ_DIR");
                 match ops::read_dir(&req.path).await {
                     Ok(entries) => {
                         send_msg(&sock_write, MSG_DIR_ENTRIES, &DirEntriesResponse { id: req.id, entries }).await?;
@@ -177,6 +186,7 @@ async fn handle_requests(
             }
             MSG_MKDIR => {
                 let req: MkdirRequest = rmp_serde::from_slice(&msg_buf)?;
+                info!(id = req.id, path = %req.path, "MKDIR");
                 match ops::mkdir(&req.path).await {
                     Ok(()) => {
                         send_msg(&sock_write, MSG_OK, &OkResponse { id: req.id }).await?;
@@ -188,6 +198,7 @@ async fn handle_requests(
             }
             MSG_WATCH => {
                 let req: WatchRequest = rmp_serde::from_slice(&msg_buf)?;
+                info!(id = req.id, path = %req.path, recursive = req.recursive, session = req.session_id, "WATCH");
                 let mut mgr = watcher_manager.lock().await;
                 match mgr.watch(req.session_id, req.req_id, &req.path, req.recursive) {
                     Ok(()) => {
@@ -200,12 +211,14 @@ async fn handle_requests(
             }
             MSG_UNWATCH => {
                 let req: UnwatchRequest = rmp_serde::from_slice(&msg_buf)?;
+                info!(id = req.id, session = %req.session_id, req_id = req.req_id, "UNWATCH");
                 let mut mgr = watcher_manager.lock().await;
                 mgr.unwatch(&req.session_id, req.req_id);
                 send_msg(&sock_write, MSG_OK, &OkResponse { id: req.id }).await?;
             }
             MSG_REALPATH => {
                 let req: RealpathRequest = rmp_serde::from_slice(&msg_buf)?;
+                info!(id = req.id, path = %req.path, "REALPATH");
                 match ops::realpath(&req.path).await {
                     Ok(path) => {
                         send_msg(&sock_write, MSG_REALPATH_RESULT, &RealpathResult { id: req.id, path }).await?;

@@ -8,7 +8,10 @@ async fn main() {
     // Log to /tmp/uplink-pty.log
     let log_dir = PathBuf::from("/tmp");
     let file_appender = rolling::never(&log_dir, "uplink-pty.log");
-    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+    let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+    
+    // Keep the guard alive for the entire program duration
+    let _guard = Box::leak(Box::new(guard));
 
     tracing_subscriber::registry()
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("debug")))
