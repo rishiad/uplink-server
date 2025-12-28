@@ -118,7 +118,7 @@ impl SimpleResponse {
 /// *Very* simple HTTP implementation. In most cases, this will just delegate to
 /// the request library on the server (i.e. `reqwest`) but it can also be used
 /// to make update/download requests on the client rather than the server,
-/// similar to SSH's `remote.SSH.localServerDownload` setting.
+/// similar to SSH's `uplink.localServerDownload` setting.
 #[async_trait]
 pub trait SimpleHttp {
 	async fn make_request(

@@ -292,7 +292,7 @@ export interface IViewDescriptor {
 
 	readonly focusCommand?: { id: string; keybindings?: IKeybindings };
 
-	// For contributed remote explorer views
+	// For contributed uplink explorer views
 	readonly group?: string;
 
 	readonly remoteAuthority?: string | string[];
