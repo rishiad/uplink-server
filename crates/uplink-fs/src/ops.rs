@@ -151,6 +151,29 @@ pub async fn read_dir(path: &str) -> Result<Vec<DirEntry>, FsError> {
     Ok(entries)
 }
 
+pub async fn read_dir_stats(path: &str) -> Result<Vec<DirEntryStat>, FsError> {
+    let mut entries = Vec::new();
+    let mut dir = fs::read_dir(path).await.map_err(FsError::from_io)?;
+    
+    while let Some(entry) = dir.next_entry().await.map_err(FsError::from_io)? {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let entry_path = entry.path();
+        
+        // Get stat info for each entry
+        match stat(entry_path.to_string_lossy().as_ref()).await {
+            Ok((file_type, ctime, mtime, size)) => {
+                entries.push(DirEntryStat { name, file_type, ctime, mtime, size });
+            }
+            Err(_) => {
+                // Skip entries we can't stat
+                entries.push(DirEntryStat { name, file_type: FILE_TYPE_UNKNOWN, ctime: 0, mtime: 0, size: 0 });
+            }
+        }
+    }
+    
+    Ok(entries)
+}
+
 pub async fn mkdir(path: &str) -> Result<(), FsError> {
     fs::create_dir_all(path).await.map_err(FsError::from_io)
 }

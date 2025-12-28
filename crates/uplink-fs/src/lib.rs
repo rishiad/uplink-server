@@ -189,6 +189,18 @@ async fn handle_requests(
                     }
                 }
             }
+            MSG_READ_DIR_STATS => {
+                let req: ReadDirRequest = rmp_serde::from_slice(&msg_buf)?;
+                info!(id = req.id, path = %req.path, "READ_DIR_STATS");
+                match ops::read_dir_stats(&req.path).await {
+                    Ok(entries) => {
+                        send_msg(&sock_write, MSG_DIR_STATS, &DirStatsResponse { id: req.id, entries }).await?;
+                    }
+                    Err(e) => {
+                        send_error(&sock_write, req.id, e).await?;
+                    }
+                }
+            }
             MSG_MKDIR => {
                 let req: MkdirRequest = rmp_serde::from_slice(&msg_buf)?;
                 info!(id = req.id, path = %req.path, "MKDIR");

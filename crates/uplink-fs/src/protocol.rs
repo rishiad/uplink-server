@@ -21,6 +21,7 @@ pub const MSG_CLOSE: u8 = 13;
 pub const MSG_READ_HANDLE: u8 = 14;
 pub const MSG_WRITE_HANDLE: u8 = 15;
 pub const MSG_CLONE_FILE: u8 = 16;
+pub const MSG_READ_DIR_STATS: u8 = 17;
 
 // Response tags (server → client)
 pub const MSG_OK: u8 = 20;
@@ -31,6 +32,7 @@ pub const MSG_DIR_ENTRIES: u8 = 24;
 pub const MSG_REALPATH_RESULT: u8 = 25;
 pub const MSG_OPEN_RESULT: u8 = 26;
 pub const MSG_READ_RESULT: u8 = 27;
+pub const MSG_DIR_STATS: u8 = 28;
 
 // Event tags (server → client, async)
 pub const MSG_FILE_CHANGE: u8 = 30;
@@ -117,6 +119,21 @@ pub struct DirEntry {
 pub struct DirEntriesResponse {
     pub id: u32,
     pub entries: Vec<DirEntry>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DirEntryStat {
+    pub name: String,
+    pub file_type: u8,
+    pub ctime: u64,
+    pub mtime: u64,
+    pub size: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DirStatsResponse {
+    pub id: u32,
+    pub entries: Vec<DirEntryStat>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
