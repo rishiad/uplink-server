@@ -16,6 +16,11 @@ pub const MSG_MKDIR: u8 = 8;
 pub const MSG_WATCH: u8 = 9;
 pub const MSG_UNWATCH: u8 = 10;
 pub const MSG_REALPATH: u8 = 11;
+pub const MSG_OPEN: u8 = 12;
+pub const MSG_CLOSE: u8 = 13;
+pub const MSG_READ_HANDLE: u8 = 14;
+pub const MSG_WRITE_HANDLE: u8 = 15;
+pub const MSG_CLONE_FILE: u8 = 16;
 
 // Response tags (server → client)
 pub const MSG_OK: u8 = 20;
@@ -24,6 +29,8 @@ pub const MSG_STAT_RESULT: u8 = 22;
 pub const MSG_DATA: u8 = 23;
 pub const MSG_DIR_ENTRIES: u8 = 24;
 pub const MSG_REALPATH_RESULT: u8 = 25;
+pub const MSG_OPEN_RESULT: u8 = 26;
+pub const MSG_READ_RESULT: u8 = 27;
 
 // Event tags (server → client, async)
 pub const MSG_FILE_CHANGE: u8 = 30;
@@ -173,4 +180,63 @@ pub struct OkResponse {
 pub struct ErrorResponse {
     pub id: u32,
     pub message: String,
+    #[serde(default)]
+    pub code: String, // FileNotFound, FileExists, NoPermissions, FileIsADirectory, Unknown
+}
+
+// File handle operations
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenRequest {
+    pub id: u32,
+    pub path: String,
+    pub create: bool,
+    pub truncate: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenResult {
+    pub id: u32,
+    pub fd: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CloseRequest {
+    pub id: u32,
+    pub fd: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ReadHandleRequest {
+    pub id: u32,
+    pub fd: u32,
+    pub pos: u64,
+    pub len: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ReadHandleResult {
+    pub id: u32,
+    pub data: Vec<u8>,
+    pub bytes_read: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WriteHandleRequest {
+    pub id: u32,
+    pub fd: u32,
+    pub pos: u64,
+    pub data: Vec<u8>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WriteHandleResult {
+    pub id: u32,
+    pub bytes_written: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CloneFileRequest {
+    pub id: u32,
+    pub src_path: String,
+    pub dest_path: String,
 }

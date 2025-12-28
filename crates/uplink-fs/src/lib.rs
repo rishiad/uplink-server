@@ -3,10 +3,13 @@
 //! Provides filesystem operations over a Unix socket using MessagePack protocol
 //! Wire format: [1 byte tag][4 byte length BE][MessagePack payload]
 
+mod handles;
 mod ops;
 mod protocol;
 mod watcher;
 
+use handles::HandleManager;
+use ops::FsError;
 use protocol::*;
 use std::path::Path;
 use std::sync::Arc;
@@ -47,6 +50,7 @@ async fn handle_client(stream: UnixStream) -> Result<(), Box<dyn std::error::Err
     let sock_write = Arc::new(Mutex::new(sock_write));
 
     let (watcher_manager, mut watch_rx) = create_watcher_manager();
+    let handle_manager = Arc::new(Mutex::new(HandleManager::new()));
 
     // Forward watch events to client
     let sock_write_clone = sock_write.clone();
@@ -63,7 +67,7 @@ async fn handle_client(stream: UnixStream) -> Result<(), Box<dyn std::error::Err
         }
     });
 
-    let request_task = handle_requests(sock_read, sock_write.clone(), watcher_manager);
+    let request_task = handle_requests(sock_read, sock_write.clone(), watcher_manager, handle_manager);
 
     tokio::select! {
         _ = watch_task => {},
@@ -77,6 +81,7 @@ async fn handle_requests(
     mut sock_read: tokio::net::unix::OwnedReadHalf,
     sock_write: Arc<Mutex<tokio::net::unix::OwnedWriteHalf>>,
     watcher_manager: SharedWatcherManager,
+    handle_manager: Arc<Mutex<HandleManager>>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     loop {
         let mut tag = [0u8; 1];
@@ -108,7 +113,7 @@ async fn handle_requests(
                         }).await?;
                     }
                     Err(e) => {
-                        send_msg(&sock_write, MSG_ERROR, &ErrorResponse { id: req.id, message: e }).await?;
+                        send_error(&sock_write, req.id, e).await?;
                     }
                 }
             }
@@ -120,7 +125,7 @@ async fn handle_requests(
                         send_msg(&sock_write, MSG_DATA, &DataResponse { id: req.id, data }).await?;
                     }
                     Err(e) => {
-                        send_msg(&sock_write, MSG_ERROR, &ErrorResponse { id: req.id, message: e }).await?;
+                        send_error(&sock_write, req.id, e).await?;
                     }
                 }
             }
@@ -132,7 +137,7 @@ async fn handle_requests(
                         send_msg(&sock_write, MSG_OK, &OkResponse { id: req.id }).await?;
                     }
                     Err(e) => {
-                        send_msg(&sock_write, MSG_ERROR, &ErrorResponse { id: req.id, message: e }).await?;
+                        send_error(&sock_write, req.id, e).await?;
                     }
                 }
             }
@@ -144,7 +149,7 @@ async fn handle_requests(
                         send_msg(&sock_write, MSG_OK, &OkResponse { id: req.id }).await?;
                     }
                     Err(e) => {
-                        send_msg(&sock_write, MSG_ERROR, &ErrorResponse { id: req.id, message: e }).await?;
+                        send_error(&sock_write, req.id, e).await?;
                     }
                 }
             }
@@ -156,7 +161,7 @@ async fn handle_requests(
                         send_msg(&sock_write, MSG_OK, &OkResponse { id: req.id }).await?;
                     }
                     Err(e) => {
-                        send_msg(&sock_write, MSG_ERROR, &ErrorResponse { id: req.id, message: e }).await?;
+                        send_error(&sock_write, req.id, e).await?;
                     }
                 }
             }
@@ -168,7 +173,7 @@ async fn handle_requests(
                         send_msg(&sock_write, MSG_OK, &OkResponse { id: req.id }).await?;
                     }
                     Err(e) => {
-                        send_msg(&sock_write, MSG_ERROR, &ErrorResponse { id: req.id, message: e }).await?;
+                        send_error(&sock_write, req.id, e).await?;
                     }
                 }
             }
@@ -180,7 +185,7 @@ async fn handle_requests(
                         send_msg(&sock_write, MSG_DIR_ENTRIES, &DirEntriesResponse { id: req.id, entries }).await?;
                     }
                     Err(e) => {
-                        send_msg(&sock_write, MSG_ERROR, &ErrorResponse { id: req.id, message: e }).await?;
+                        send_error(&sock_write, req.id, e).await?;
                     }
                 }
             }
@@ -192,7 +197,7 @@ async fn handle_requests(
                         send_msg(&sock_write, MSG_OK, &OkResponse { id: req.id }).await?;
                     }
                     Err(e) => {
-                        send_msg(&sock_write, MSG_ERROR, &ErrorResponse { id: req.id, message: e }).await?;
+                        send_error(&sock_write, req.id, e).await?;
                     }
                 }
             }
@@ -205,7 +210,7 @@ async fn handle_requests(
                         send_msg(&sock_write, MSG_OK, &OkResponse { id: req.id }).await?;
                     }
                     Err(e) => {
-                        send_msg(&sock_write, MSG_ERROR, &ErrorResponse { id: req.id, message: e }).await?;
+                        send_msg(&sock_write, MSG_ERROR, &ErrorResponse { id: req.id, message: e, code: "Unknown".into() }).await?;
                     }
                 }
             }
@@ -224,13 +229,77 @@ async fn handle_requests(
                         send_msg(&sock_write, MSG_REALPATH_RESULT, &RealpathResult { id: req.id, path }).await?;
                     }
                     Err(e) => {
-                        send_msg(&sock_write, MSG_ERROR, &ErrorResponse { id: req.id, message: e }).await?;
+                        send_error(&sock_write, req.id, e).await?;
+                    }
+                }
+            }
+            MSG_OPEN => {
+                let req: OpenRequest = rmp_serde::from_slice(&msg_buf)?;
+                info!(id = req.id, path = %req.path, "OPEN");
+                let mut mgr = handle_manager.lock().await;
+                match mgr.open(&req.path, req.create, req.truncate).await {
+                    Ok(fd) => {
+                        send_msg(&sock_write, MSG_OPEN_RESULT, &OpenResult { id: req.id, fd }).await?;
+                    }
+                    Err(e) => {
+                        send_error(&sock_write, req.id, e).await?;
+                    }
+                }
+            }
+            MSG_CLOSE => {
+                let req: CloseRequest = rmp_serde::from_slice(&msg_buf)?;
+                info!(id = req.id, fd = req.fd, "CLOSE");
+                let mut mgr = handle_manager.lock().await;
+                match mgr.close(req.fd).await {
+                    Ok(()) => {
+                        send_msg(&sock_write, MSG_OK, &OkResponse { id: req.id }).await?;
+                    }
+                    Err(e) => {
+                        send_error(&sock_write, req.id, e).await?;
+                    }
+                }
+            }
+            MSG_READ_HANDLE => {
+                let req: ReadHandleRequest = rmp_serde::from_slice(&msg_buf)?;
+                debug!(id = req.id, fd = req.fd, pos = req.pos, len = req.len, "READ_HANDLE");
+                let mut mgr = handle_manager.lock().await;
+                match mgr.read(req.fd, req.pos, req.len).await {
+                    Ok((data, bytes_read)) => {
+                        send_msg(&sock_write, MSG_READ_RESULT, &ReadHandleResult { id: req.id, data, bytes_read }).await?;
+                    }
+                    Err(e) => {
+                        send_error(&sock_write, req.id, e).await?;
+                    }
+                }
+            }
+            MSG_WRITE_HANDLE => {
+                let req: WriteHandleRequest = rmp_serde::from_slice(&msg_buf)?;
+                debug!(id = req.id, fd = req.fd, pos = req.pos, len = req.data.len(), "WRITE_HANDLE");
+                let mut mgr = handle_manager.lock().await;
+                match mgr.write(req.fd, req.pos, &req.data).await {
+                    Ok(bytes_written) => {
+                        send_msg(&sock_write, MSG_OK, &WriteHandleResult { id: req.id, bytes_written }).await?;
+                    }
+                    Err(e) => {
+                        send_error(&sock_write, req.id, e).await?;
+                    }
+                }
+            }
+            MSG_CLONE_FILE => {
+                let req: CloneFileRequest = rmp_serde::from_slice(&msg_buf)?;
+                info!(id = req.id, src = %req.src_path, dest = %req.dest_path, "CLONE_FILE");
+                match ops::clone_file(&req.src_path, &req.dest_path).await {
+                    Ok(()) => {
+                        send_msg(&sock_write, MSG_OK, &OkResponse { id: req.id }).await?;
+                    }
+                    Err(e) => {
+                        send_error(&sock_write, req.id, e).await?;
                     }
                 }
             }
             _ => {
                 warn!(tag = tag[0], "Unknown message type");
-                send_msg(&sock_write, MSG_ERROR, &ErrorResponse { id: 0, message: "unknown message type".into() }).await?;
+                send_msg(&sock_write, MSG_ERROR, &ErrorResponse { id: 0, message: "unknown message type".into(), code: "Unknown".into() }).await?;
             }
         }
     }
@@ -248,4 +317,16 @@ async fn send_msg<T: serde::Serialize>(
     sock.write_all(&(data.len() as u32).to_be_bytes()).await?;
     sock.write_all(&data).await?;
     Ok(())
+}
+
+async fn send_error(
+    sock: &Arc<Mutex<tokio::net::unix::OwnedWriteHalf>>,
+    id: u32,
+    e: FsError,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    send_msg(sock, MSG_ERROR, &ErrorResponse {
+        id,
+        message: e.message,
+        code: e.code.into(),
+    }).await
 }
